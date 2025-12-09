@@ -2,40 +2,55 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<title>真・結界師VR — Quest操作完全対応版</title>
+<title>真・結界師VR — 最終完動版</title>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover, user-scalable=no">
 <style>
   html, body { height: 100%; margin: 0; background: #87CEEB; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
   canvas { display: block; width: 100%; height: 100%; }
-
+  
+  /* エラーログ */
   #error-log { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); color:#ff5555; padding:20px; z-index:9999; white-space:pre-wrap; font-weight:bold; overflow:auto; }
+  
+  /* ダメージ演出 */
   #damage-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: red; opacity: 0; pointer-events: none; z-index: 50; transition: opacity 0.1s; }
 
+  /* HUD */
   #hud { position: fixed; top: 16px; left: 16px; pointer-events: none; z-index: 10; }
+  @supports (padding-top: env(safe-area-inset-top)) { #hud { top: calc(env(safe-area-inset-top) + 10px); left: calc(env(safe-area-inset-left) + 16px); } }
   .hud-box { background: rgba(0, 30, 60, 0.7); padding: 8px 16px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.3); margin-bottom: 8px; backdrop-filter: blur(4px); min-width: 140px; }
   .big-text { font-size: 18px; font-weight: bold; color: #ffeb3b; text-shadow: 1px 1px 2px #000; }
   .sub-text { font-size: 14px; color: #e0e0e0; }
   .hp-bar-bg { width: 100%; height: 8px; background: #555; margin-top: 4px; border-radius: 4px; overflow: hidden; }
   .hp-bar-val { width: 100%; height: 100%; background: #0f0; transition: width 0.2s; }
 
+  /* メッセージ */
   #msgArea { position: fixed; top: 35%; left: 0; width: 100%; text-align: center; pointer-events: none; z-index: 20; }
   .flash-msg { font-size: 40px; font-weight: 900; color: #fff; text-shadow: 0 0 10px #f0a, 2px 2px 0 #000; opacity: 0; transition: opacity 0.3s; }
 
-  /* スマホ用UI (VR時は非表示) */
+  /* スマホ用UI */
   #uiLayer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
-  #stickZone { position: absolute; bottom: 40px; left: 40px; width: 140px; height: 140px; pointer-events: auto; }
+  #stickZone { position: absolute; bottom: 40px; left: 40px; width: 140px; height: 140px; pointer-events: auto; margin-bottom: env(safe-area-inset-bottom); margin-left: env(safe-area-inset-left); }
   .stick-base { width: 100%; height: 100%; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; position: relative; }
   .stick-knob { width: 60px; height: 60px; background: #fff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 10px rgba(0,0,0,0.3); pointer-events: none; }
-  #padArea { position: absolute; bottom: 40px; right: 40px; width: 200px; height: 200px; pointer-events: none; }
-  .btn { position: absolute; width: 65px; height: 65px; z-index: 10; border-radius: 50%; border: 2px solid rgba(255,255,255,0.6); background: rgba(40,50,80,0.8); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; pointer-events: auto; touch-action: manipulation; }
-  
+  #padArea { position: absolute; bottom: 40px; right: 40px; width: 200px; height: 200px; pointer-events: none; margin-bottom: env(safe-area-inset-bottom); margin-right: env(safe-area-inset-right); }
+  .btn { position: absolute; width: 65px; height: 65px; z-index: 10; border-radius: 50%; border: 2px solid rgba(255,255,255,0.6); background: rgba(40,50,80,0.8); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; pointer-events: auto; touch-action: manipulation; transition: transform 0.1s; }
+  .btn:active { transform: scale(0.9); background: rgba(60,70,100,0.9); }
   #btnUp { top: 0; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #607d8b, #455a64); }
   #btnDown { bottom: 0; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #9c27b0, #7b1fa2); width: 75px; height: 75px; font-size: 16px; }
   #btnLeft { top: 50%; left: 0; transform: translateY(-50%); background: linear-gradient(135deg, #f44336, #c62828); }
   #btnRight { top: 50%; right: 0; transform: translateY(-50%); background: linear-gradient(135deg, #03a9f4, #0288d1); width: 75px; height: 75px; font-size: 18px; }
-  
+  #btnRight.drawing { background: #fff; color: #0288d1; transform: translateY(-50%) scale(1.1); }
+  #modeSwitch { position: absolute; top: -60px; right: 0; width: 120px; height: 40px; background: rgba(0,0,0,0.6); border: 2px solid #fff; border-radius: 20px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; pointer-events:auto; transition: background 0.3s; }
+  #modeSwitch.phys { background: linear-gradient(90deg, #FFD700, #FF8C00); color:#000; border-color:#fff; }
+  #modeSwitch.ghost { background: linear-gradient(90deg, #00bfff, #0000ff); color:#fff; border-color:#00ffff; }
+
+  @media (orientation: portrait) {
+    #stickZone { width: 120px; height: 120px; bottom: 20px; left: 20px; } .stick-knob { width: 50px; height: 50px; }
+    #padArea { width: 170px; height: 170px; bottom: 20px; right: 20px; } .btn { width: 55px; height: 55px; font-size: 10px; }
+    #btnDown, #btnRight { width: 65px; height: 65px; } .big-text { font-size: 16px; } .sub-text { font-size: 12px; }
+  }
+
   #centerReticle { position: fixed; top: 50%; left: 50%; width: 6px; height: 6px; background: rgba(255,255,255,0.8); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; border: 1px solid rgba(0,0,0,0.5); }
-  #vrBtn { position: fixed; top: 10px; right: 10px; padding: 8px 16px; background: rgba(0,0,0,0.8); border: 2px solid #fff; color: #fff; border-radius: 6px; z-index: 200; pointer-events: auto; font-weight: bold; cursor: pointer; }
 </style>
 
 <script>
@@ -80,12 +95,12 @@
 
 <div id="msgArea"><div id="flashMsg" class="flash-msg"></div></div>
 <div id="centerReticle"></div>
-<button id="vrBtn">VR START</button>
 
 <div id="uiLayer">
   <div id="stickZone"><div class="stick-base"><div id="stickKnob" class="stick-knob"></div></div></div>
   <div id="padArea">
-    <div id="btnUp" class="btn">距離<br><span style="color:#fe0">近</span></div>
+    <div id="modeSwitch" class="ghost">モード: 幽体</div>
+    <div id="btnUp" class="btn">距離<br><span id="distLabel" style="color:#fe0">近</span></div>
     <div id="btnLeft" class="btn">滅<br><span style="font-size:10px">⇔解</span></div>
     <div id="btnRight" class="btn">結<br><span style="font-size:10px">Hold</span></div>
     <div id="btnDown" class="btn">跳</div>
@@ -112,38 +127,32 @@ let scene, camera, renderer, world;
 let playerBody, playerGroup;
 let enemies = [], kekkaiList = [], items = [], vip = null;
 let gameState = { wave: 1, kills: 0, req: 3, nextSpawn: 0, playerHp: 100, isVipMode: false };
-let currentDist = CFG.dist.near, aimMarker;
-let controller1, controller2; // VR Controllers for tracking position
-
-// Global State
-let drawState = { active: false, startHandPos: new THREE.Vector3(), ghost: null, mode: 'ghost' }; // mode: 'ghost' or 'phys'
-let activePhysKekkai = null;
-let input = { x: 0, y: 0 }, camAngle = { yaw: 0, pitch: 0 };
-let lastT = 0;
-
-// State management for VR Buttons (to detect 'press' event only once)
-let vrBtnState = {
-  leftTrigger: false, rightTrigger: false,
-  rightA: false, rightB: false, leftX: false,
-  leftGrip: false, rightGrip: false
-};
+let currentDist = CFG.dist.near, aimMarker, isPhysMode = false;
 
 const els = {
   stick: document.getElementById('stickZone'), knob: document.getElementById('stickKnob'),
   msg: document.getElementById('flashMsg'),
   btnDist: document.getElementById('btnUp'), btnJump: document.getElementById('btnDown'),
   btnAct: document.getElementById('btnLeft'), btnDraw: document.getElementById('btnRight'),
+  modeBtn: document.getElementById('modeSwitch'),
+  distLabel: document.getElementById('distLabel'),
+  wVal: document.getElementById('waveVal'), kVal: document.getElementById('killVal'), tVal: document.getElementById('targetVal'),
   hpText: document.getElementById('hpText'), hpBar: document.getElementById('hpBar'),
   dmgOverlay: document.getElementById('damage-overlay'),
   vipBox: document.getElementById('vipBox'), vipHpBar: document.getElementById('vipHpBar'),
   kekVal: document.getElementById('kekVal')
 };
 
+let drawId = null, drawState = { active: false, startX: 0, startY: 0, ghost: null }, activePhysKekkai = null;
+let input = { x: 0, y: 0 }, camAngle = { yaw: 0, pitch: 0 };
+let stickId = null, stickStart = { x: 0, y: 0 }, tapTime = 0, tapPos = { x: 0, y: 0 };
+let actId = null, actStartPos = { x: 0, y: 0 }, lookId = null, lastLook = { x: 0, y: 0 };
+let lastT = 0, vrState = { lastDraw: false, lastAct: false, lastDist: false, lastMode: false, lastActL: false };
+
 function init() {
   try {
     scene = new THREE.Scene(); scene.background = new THREE.Color(CFG.colors.sky); 
     scene.fog = new THREE.FogExp2(CFG.colors.sky, 0.005);
-    
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
     playerGroup = new THREE.Group(); playerGroup.add(camera); 
     camera.position.set(0, CFG.player.height, 0); scene.add(playerGroup);
@@ -153,18 +162,14 @@ function init() {
     renderer.shadowMap.enabled = true; 
     renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
     
-    // VR Setup
+    // VR設定
     renderer.xr.enabled = true;
     renderer.xr.setReferenceSpaceType('local-floor'); 
     document.body.appendChild(renderer.domElement);
 
-    // Add Controllers to Scene for Position Tracking
-    controller1 = renderer.xr.getController(0); scene.add(controller1); // Usually Right
-    controller2 = renderer.xr.getController(1); scene.add(controller2); // Usually Left
-
-    const vrButton = VRButton.createButton(renderer);
-    document.body.appendChild(vrButton);
-    document.getElementById('vrBtn').style.display='none'; 
+    // 公式VRボタンを追加（Enter VRボタンが画面下に出ます）
+    const vrBtnElement = VRButton.createButton(renderer);
+    document.body.appendChild(vrBtnElement);
 
     renderer.xr.addEventListener('sessionstart', () => {
       document.getElementById('uiLayer').style.display = 'none';
@@ -176,7 +181,7 @@ function init() {
     });
 
     world = new CANNON.World(); world.gravity.set(0, -30, 0);
-    const mDef=new CANNON.Material('def'), mPly=new CANNON.Material('ply'), mEne=new CANNON.Material('ene'), mKek=new CANNON.Material('kek');
+    const mDef=new CANNON.Material('def'), mPly=new CANNON.Material('ply'), mEne=new CANNON.Material('ene'), mKek=new CANNON.Material('kek'), mItem=new CANNON.Material('item');
     
     world.addContactMaterial(new CANNON.ContactMaterial(mPly, mDef, { friction: 0.0, restitution: 0.0 }));
     world.addContactMaterial(new CANNON.ContactMaterial(mEne, mDef, { friction: 0.5, restitution: 0.3 }));
@@ -211,7 +216,7 @@ function init() {
   } catch (e) { console.error(e); alert("初期化エラー: " + e.message); }
 }
 
-// --- Logic Functions ---
+// Logic Functions
 function takeDamage(val) {
   gameState.playerHp = Math.max(0, gameState.playerHp - val);
   els.hpText.textContent = gameState.playerHp;
@@ -255,7 +260,7 @@ function updateAimMarker() {
   p.y = Math.max(0.5, p.y); aimMarker.position.copy(p);
 }
 
-// --- Kekkai System ---
+// Active Kekkai
 function createActiveKekkai(isPhysical) {
   const p = aimMarker.position.clone(), r = camAngle.yaw;
   const g = new THREE.BoxGeometry(1, 1, 1);
@@ -274,8 +279,7 @@ function createActiveKekkai(isPhysical) {
 }
 
 function updateActiveKekkai(k, dx, dy) {
-  const sx = 1.0 + Math.max(0, dx * 5), sy = 1.0 + Math.max(0, dy * 5), sz = sx; // Gesture scale speed adjusted
-  k.currentS = { x: sx, y: sy, z: sz };
+  const sx = 1.0 + Math.max(0, dx), sy = 1.0 + Math.max(0, dy), sz = sx; k.currentS = { x: sx, y: sy, z: sz };
   k.mesh.scale.set(sx, sy, sz);
   const newY = k.startP.y + (sy - 1.0) / 2; 
   k.mesh.position.y = newY; 
@@ -296,7 +300,7 @@ function finalizeKekkai(k) {
   spawnText(k.isPhysical ? "顕" : "結", k.mesh.position, "#ff0"); updateHUD();
 }
 
-function createKekkaiMobile(p, s, r) {
+function createKekkai(p, s, r) {
   const b = new CANNON.Body({ mass: 0, material: new CANNON.Material('kek') }); b.position.copy(p); b.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), r);
   const t = 0.5, x = s.x / 2, y = s.y / 2, z = s.z / 2, aw = (d, o) => b.addShape(new CANNON.Box(d), o);
   aw(new CANNON.Vec3(t, y, z), new CANNON.Vec3(-x, 0, 0)); aw(new CANNON.Vec3(t, y, z), new CANNON.Vec3(x, 0, 0));
@@ -325,9 +329,7 @@ function actionKai() { const t = kekkaiList[kekkaiList.length - 1]; if (t) { sho
 function spawnEnemy() {
   if (enemies.length >= 6 + gameState.wave) return;
   const r = Math.random(); let x, y, z; const fW = CFG.field.width, fD = CFG.field.depth;
-  if (r < 0.6) { x = (Math.random() - .5) * fW; z = (Math.random() - .5) * fD; y = 20; }
-  else if (r < 0.8) { x = (Math.random() - .5) * (fW - 5); z = (-fD / 2 - 20) + (Math.random() - .5) * 30; y = 35; }
-  else { x = (fW / 2 - 25) + (Math.random() - .5) * 20; z = (Math.random() - .5) * 50; y = 10; }
+  if (r < 0.6) { x = (Math.random() - .5) * fW; z = (Math.random() - .5) * fD; y = 20; } else if (r < 0.8) { x = (Math.random() - .5) * (fW - 5); z = (-fD / 2 - 20) + (Math.random() - .5) * 30; y = 35; } else { x = (fW / 2 - 25) + (Math.random() - .5) * 20; z = (Math.random() - .5) * 50; y = 10; }
   if (Math.random() < 0.2) spawnGiant(x, y, z);
   else {
     const sz = 0.6 + Math.random() * 0.8, cl = new THREE.Color().setHSL(Math.random(), 0.8, 0.5), ms = 15 * sz;
@@ -361,6 +363,19 @@ function killEnemy(e) {
   updateHUD();
 }
 function removeEnemy(e) { if (!enemies.includes(e)) return; enemies = enemies.filter(o => o !== e); scene.remove(e.mesh); world.removeBody(e.body); updateHUD(); }
+function spawnItem(pos) {
+  const b = new CANNON.Body({ mass: 1, shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)), material: new CANNON.Material('item') }); b.position.copy(pos); world.addBody(b);
+  const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: CFG.colors.item, wireframe: true })); m.position.copy(pos); scene.add(m); m.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: CFG.colors.item })));
+  items.push({ body: b, mesh: m });
+}
+function startVipMission() {
+  if (vip) return; gameState.isVipMode = true; showMsg("護衛任務開始!", "#0ff"); els.vipBox.style.display = "block";
+  const b = new CANNON.Body({ mass: 50, shape: new CANNON.Cylinder(0.5, 0.5, 1.8, 8), material: new CANNON.Material('ply'), fixedRotation: true, linearDamping: 0.5 });
+  b.position.set(0, 5, CFG.field.depth / 2 - 10); world.addBody(b);
+  const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.8, 16), new THREE.MeshStandardMaterial({ color: CFG.colors.vip })));
+  const h = new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshStandardMaterial({ color: 0xffcccc })); h.position.y = 1.0; g.add(h); scene.add(g);
+  vip = { body: b, mesh: g, hp: 100, goal: new CANNON.Vec3(0, 5, -CFG.field.depth / 2 + 30) };
+}
 
 function setupEnvironment(mat){
   const sun=new THREE.DirectionalLight(0xffffee,1.2); sun.position.set(-50,100,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.left=-100; sun.shadow.camera.right=100; sun.shadow.camera.top=100; sun.shadow.camera.bottom=-100; scene.add(sun); scene.add(new THREE.AmbientLight(0x555566,0.6));
@@ -417,11 +432,11 @@ function setupEnvironment(mat){
   const pfH=1.5, pOutW=pW+2, pOutD=pD+2; const cf=(x,z,w,d)=>{const f=new THREE.Mesh(new THREE.BoxGeometry(w,pfH,d),new THREE.MeshStandardMaterial({color:0xdddddd,transparent:true,opacity:0.3}));f.position.set(x,2.0+pfH/2,z);scene.add(f);const b=new CANNON.Body({mass:0});b.addShape(new CANNON.Box(new CANNON.Vec3(w/2,pfH/2,d/2)));b.position.copy(f.position);world.addBody(b);};
   cf(pX+pOutW/2, pZ, 0.2, pOutD); cf(pX, pZ-pOutD/2, pOutW, 0.2); cf(pX, pZ+pOutD/2, pOutW, 0.2);
   const gap=14; cf(pX-pOutW/2, pZ-(pD/2+gap)/2, 0.2, pD/2-gap); cf(pX-pOutW/2, pZ+(pD/2+gap)/2, 0.2, pD/2-gap);
+
   const gZ=FD/2; createBox(-15,5,gZ,5,10,5,0x888888); createBox(15,5,gZ,5,10,5,0x888888); createBox(0,4,gZ,25,8,1,0x555555);
 }
 
 function setupInputs(){
-  // Mobile Touch Logic
   els.stick.addEventListener('touchstart',e=>{e.preventDefault();if(stickId!==null)return;const t=e.changedTouches[0];stickId=t.identifier;const r=els.stick.getBoundingClientRect();stickStart={x:r.left+r.width/2,y:r.top+r.height/2};tapTime=Date.now();tapPos={x:t.clientX,y:t.clientY};moveStick(t.clientX,t.clientY);},{passive:false});
   els.stick.addEventListener('touchmove',e=>{e.preventDefault();for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===stickId)moveStick(e.changedTouches[i].clientX,e.changedTouches[i].clientY);},{passive:false});
   const endStick=e=>{for(let i=0;i<e.changedTouches.length;i++){const t=e.changedTouches[i];if(t.identifier===stickId){if(Date.now()-tapTime<200&&Math.hypot(t.clientX-tapPos.x,t.clientY-tapPos.y)<15){if(playerBody&&Math.abs(playerBody.velocity.y)<1)playerBody.velocity.y=CFG.player.jump;}stickId=null;input.x=0;input.y=0;els.knob.style.transform='translate(-50%,-50%)';}}};
@@ -464,7 +479,6 @@ function setupInputs(){
 function loop(t){
   const dt=Math.min((t-lastT)/1000,0.1); lastT=t;
   world.step(1/60, dt, 3);
-  
   if(renderer.xr.isPresenting){
     const s=renderer.xr.getSession();
     if(s){
@@ -478,24 +492,21 @@ function loop(t){
            // Left Grip (1): Create Physical Kekkai (Start on Press)
            if(gp.buttons[1]?.pressed){
              if(!activePhysKekkai && !drawState.active){
-               // Start Phys
                activePhysKekkai = createActiveKekkai(true);
-               activePhysKekkai.startHandPos = new THREE.Vector3(0,0,0); // Need actual hand pos for gesture? Simplified: Use Stick?
-               // Let's use Stick Y for expansion if Grip is held
              }
              if(activePhysKekkai){
-               // Gesture: Move controller or use Stick? Prompt said "move controller".
-               // Getting controller delta is complex here without more state. 
-               // Fallback: Use right stick Y for size, or time.
-               // Let's use Time based expansion for VR simplicity as in previous version
-               const scale = 1.0 + (Date.now()%1500)/300; 
-               updateActiveKekkai(activePhysKekkai, scale-1, scale-1);
+               // Gesture scaling using controller movement is hard without frame deltas.
+               // Using Right Stick Y (gp.axes[3]) for sizing? Or just time based expanding for simplicity in VR
+               // Let's use Time expansion + Controller height for vertical?
+               // Simple: Auto expand while held
+               const expand = 0.05; 
+               const curS = activePhysKekkai.currentS;
+               updateActiveKekkai(activePhysKekkai, (curS.x-1+expand)/5, (curS.y-1+expand)/5); // Normalize to dx
                // Follow marker
                activePhysKekkai.body.position.copy(aimMarker.position).y += (activePhysKekkai.currentS.y/2);
                activePhysKekkai.mesh.position.copy(activePhysKekkai.body.position);
              }
            } else {
-             // Grip Released: Finalize
              if(activePhysKekkai){ finalizeKekkai(activePhysKekkai); activePhysKekkai=null; }
            }
            // Left Trigger (0): Kai
@@ -506,6 +517,7 @@ function loop(t){
         if(src.handedness==='right'){
            // Right Stick: Rotate
            if(gp.axes.length>=4 && Math.abs(gp.axes[2])>0.5) camAngle.yaw -= gp.axes[2]*0.04;
+           
            // Right Grip (1): Create Ghost Kekkai
            if(gp.buttons[1]?.pressed){
               if(!drawState.active && !activePhysKekkai && kekkaiList.length<CFG.kekkai.max){
@@ -514,7 +526,7 @@ function loop(t){
                  drawState.ghost=new THREE.Mesh(gg,gm); scene.add(drawState.ghost);
               }
               if(drawState.ghost){
-                 const scale = 1.0 + (Date.now()%1500)/300; 
+                 const scale = drawState.ghost.scale.x + 0.05; // Auto expand
                  drawState.ghost.scale.set(scale,scale,scale);
                  drawState.ghost.position.copy(aimMarker.position).y += (scale/2 - 0.5);
                  drawState.ghost.rotation.y = camAngle.yaw;
@@ -536,7 +548,6 @@ function loop(t){
         }
       }
     }
-    // Update player pos in VR
     const cam=renderer.xr.getCamera(),d=new THREE.Vector3();cam.getWorldDirection(d);d.y=0;d.normalize();
     const r=new THREE.Vector3().crossVectors(d,new THREE.Vector3(0,1,0)),m=d.multiplyScalar(-input.y).add(r.multiplyScalar(input.x)).multiplyScalar(CFG.player.speed);
     playerBody.velocity.x=m.x;playerBody.velocity.z=m.z;playerGroup.position.copy(playerBody.position);
@@ -573,7 +584,6 @@ function loop(t){
   });
   renderer.render(scene,camera);
 }
-document.getElementById('vrBtn').addEventListener('click', ()=>{ if(navigator.xr) navigator.xr.requestSession('immersive-vr').then(s=>{ renderer.xr.setSession(s); document.getElementById('uiLayer').style.display='none'; }); });
 window.onload = init;
 </script>
 </body>
