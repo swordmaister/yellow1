@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<title>真・結界師VR — 感度100倍＆完動版</title>
+<title>真・結界師VR — 完動修正版</title>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover, user-scalable=no">
 <style>
   html, body { height: 100%; margin: 0; background: #87CEEB; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
@@ -30,7 +30,6 @@
   #padArea { position: absolute; bottom: 40px; right: 40px; width: 200px; height: 200px; pointer-events: none; margin-bottom: env(safe-area-inset-bottom); margin-right: env(safe-area-inset-right); }
   .btn { position: absolute; width: 65px; height: 65px; z-index: 10; border-radius: 50%; border: 2px solid rgba(255,255,255,0.6); background: rgba(40,50,80,0.8); color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; font-weight: bold; font-size: 12px; pointer-events: auto; touch-action: manipulation; transition: transform 0.1s; }
   .btn:active { transform: scale(0.9); background: rgba(60,70,100,0.9); }
-
   #btnUp { top: 0; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #607d8b, #455a64); }
   #btnDown { bottom: 0; left: 50%; transform: translateX(-50%); background: linear-gradient(135deg, #9c27b0, #7b1fa2); width: 75px; height: 75px; font-size: 16px; }
   #btnLeft { top: 50%; left: 0; transform: translateY(-50%); background: linear-gradient(135deg, #f44336, #c62828); }
@@ -39,20 +38,23 @@
   #modeSwitch { position: absolute; top: -60px; right: 0; width: 120px; height: 40px; background: rgba(0,0,0,0.6); border: 2px solid #fff; border-radius: 20px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; pointer-events:auto; transition: background 0.3s; }
   #modeSwitch.phys { background: linear-gradient(90deg, #FFD700, #FF8C00); color:#000; border-color:#fff; }
   #modeSwitch.ghost { background: linear-gradient(90deg, #00bfff, #0000ff); color:#fff; border-color:#00ffff; }
+
   @media (orientation: portrait) {
     #stickZone { width: 120px; height: 120px; bottom: 20px; left: 20px; } .stick-knob { width: 50px; height: 50px; }
     #padArea { width: 170px; height: 170px; bottom: 20px; right: 20px; } .btn { width: 55px; height: 55px; font-size: 10px; }
     #btnDown, #btnRight { width: 65px; height: 65px; } .big-text { font-size: 16px; } .sub-text { font-size: 12px; }
   }
+
   #centerReticle { position: fixed; top: 50%; left: 50%; width: 6px; height: 6px; background: rgba(255,255,255,0.8); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; border: 1px solid rgba(0,0,0,0.5); }
   #vrBtn { position: fixed; top: 10px; right: 10px; padding: 8px 16px; background: rgba(0,0,0,0.8); border: 2px solid #fff; color: #fff; border-radius: 6px; z-index: 200; pointer-events: auto; font-weight: bold; cursor: pointer; }
 </style>
+
 <script>
   window.onerror = function(msg, url, line) {
-    const box = document.getElementById('error-log'); box.style.display = 'block';
-    box.textContent += "Error: " + msg + "\nLine: " + line + "\n"; return false;
+    const box = document.getElementById('error-log'); box.style.display = 'block'; box.textContent += "Error: " + msg + "\nLine: " + line + "\n"; return false;
   };
 </script>
+
 <script type="importmap">
 {
   "imports": {
@@ -121,7 +123,6 @@ let enemies = [], kekkaiList = [], items = [], vip = null;
 let gameState = { wave: 1, kills: 0, req: 3, nextSpawn: 0, playerHp: 100, isVipMode: false };
 let currentDist = CFG.dist.near, aimMarker, isPhysMode = false;
 
-// Global UI
 const els = {
   stick: document.getElementById('stickZone'), knob: document.getElementById('stickKnob'),
   msg: document.getElementById('flashMsg'),
@@ -143,34 +144,120 @@ let stickId = null, stickStart = { x: 0, y: 0 }, tapTime = 0, tapPos = { x: 0, y
 let actId = null, actStartPos = { x: 0, y: 0 }, lookId = null, lastLook = { x: 0, y: 0 };
 let lastT = 0, vrState = { lastAct: false, lastDist: false, lastMode: false, lastActL: false };
 
-// --- ユーティリティ関数（全てグローバルに配置） ---
+function init() {
+  try {
+    scene = new THREE.Scene(); scene.background = new THREE.Color(CFG.colors.sky); 
+    scene.fog = new THREE.FogExp2(CFG.colors.sky, 0.005);
+    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
+    playerGroup = new THREE.Group(); playerGroup.add(camera); 
+    camera.position.set(0, CFG.player.height, 0); scene.add(playerGroup);
+    
+    renderer = new THREE.WebGLRenderer({ antialias: true }); 
+    renderer.setSize(window.innerWidth, window.innerHeight); 
+    renderer.shadowMap.enabled = true; 
+    renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
+    renderer.xr.enabled = true; 
+    renderer.xr.setReferenceSpaceType('local-floor');
+    document.body.appendChild(renderer.domElement);
 
-function showMsg(t, c) {
-  els.msg.textContent = t; els.msg.style.color = c; els.msg.style.opacity = 1; setTimeout(() => els.msg.style.opacity = 0, 800);
+    const vrButton = VRButton.createButton(renderer);
+    document.body.appendChild(vrButton);
+    document.getElementById('vrBtn').style.display='none'; 
+
+    renderer.xr.addEventListener('sessionstart', () => {
+      document.getElementById('uiLayer').style.display = 'none';
+      document.getElementById('centerReticle').style.display = 'none';
+      isPhysMode = false; 
+    });
+    renderer.xr.addEventListener('sessionend', () => {
+      document.getElementById('uiLayer').style.display = 'block';
+      document.getElementById('centerReticle').style.display = 'block';
+    });
+
+    world = new CANNON.World(); world.gravity.set(0, -30, 0);
+    const mDef=new CANNON.Material('def'), mPly=new CANNON.Material('ply'), mEne=new CANNON.Material('ene'), mKek=new CANNON.Material('kek');
+    
+    world.addContactMaterial(new CANNON.ContactMaterial(mPly, mDef, { friction: 0.0, restitution: 0.0 }));
+    world.addContactMaterial(new CANNON.ContactMaterial(mEne, mDef, { friction: 0.5, restitution: 0.3 }));
+    world.addContactMaterial(new CANNON.ContactMaterial(mKek, mEne, { friction: 0.1, restitution: 0.8 }));
+    world.addContactMaterial(new CANNON.ContactMaterial(mKek, mPly, { friction: 0.8, restitution: 0.0 }));
+    world.addContactMaterial(new CANNON.ContactMaterial(mPly, mEne, { friction: 0.5, restitution: 0.5 }));
+
+    playerBody = new CANNON.Body({ mass: 70, shape: new CANNON.Sphere(0.6), material: mPly, fixedRotation: true, linearDamping: 0.9 });
+    playerBody.position.set(0, 5, 30); world.addBody(playerBody);
+
+    playerBody.addEventListener('collide', (e) => {
+      if (e.body && e.body.material && e.body.material.name === 'ene') {
+        const relVel = e.contact.getImpactVelocityAlongNormal();
+        if (Math.abs(relVel) > 2.0) {
+          takeDamage(Math.floor(Math.abs(relVel) * 2));
+          const normal = new CANNON.Vec3(); e.contact.ni.negate(normal);
+          playerBody.applyImpulse(normal.scale(50 * Math.abs(relVel)), playerBody.position);
+        }
+      }
+    });
+
+    setupEnvironment(mDef);
+    const aimGeo = new THREE.SphereGeometry(0.3, 16, 16);
+    const aimMat = new THREE.MeshBasicMaterial({ color: CFG.colors.marker, transparent: true, opacity: 0.7, depthTest: false });
+    aimMarker = new THREE.Mesh(aimGeo, aimMat); aimMarker.renderOrder = 999; scene.add(aimMarker);
+
+    setupInputs(); 
+    for (let i = 0; i < 3; i++) spawnEnemy(); 
+    renderer.setAnimationLoop(loop);
+
+  } catch (e) { console.error(e); alert("初期化エラー: " + e.message); }
 }
 
-function updateHUD() {
-  els.wVal.textContent = gameState.wave; els.kVal.textContent = gameState.kills; els.tVal.textContent = gameState.req; 
-  if(els.kekVal) els.kekVal.textContent = kekkaiList.length;
+// --- Inputs ---
+function setupInputs(){
+  // Stick
+  els.stick.addEventListener('touchstart', e => { e.preventDefault(); if(stickId!==null)return; const t=e.changedTouches[0]; stickId=t.identifier; const r=els.stick.getBoundingClientRect(); stickStart={x:r.left+r.width/2,y:r.top+r.height/2}; tapTime=Date.now(); tapPos={x:t.clientX,y:t.clientY}; moveStick(t.clientX,t.clientY); }, {passive:false});
+  els.stick.addEventListener('touchmove', e => { e.preventDefault(); for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===stickId)moveStick(e.changedTouches[i].clientX,e.changedTouches[i].clientY); }, {passive:false});
+  const endStick = e => { for(let i=0;i<e.changedTouches.length;i++){const t=e.changedTouches[i];if(t.identifier===stickId){if(Date.now()-tapTime<200&&Math.hypot(t.clientX-tapPos.x,t.clientY-tapPos.y)<15){if(playerBody&&Math.abs(playerBody.velocity.y)<1)playerBody.velocity.y=CFG.player.jump;}stickId=null;input.x=0;input.y=0;els.knob.style.transform='translate(-50%,-50%)';}} };
+  els.stick.addEventListener('touchend', endStick); els.stick.addEventListener('touchcancel', endStick);
+  function moveStick(cx,cy){let dx=cx-stickStart.x, dy=cy-stickStart.y, d=Math.hypot(dx,dy), max=(els.stick.offsetWidth/2)*0.8; if(d>max){dx*=max/d;dy*=max/d;} input.x=dx/max; input.y=dy/max; els.knob.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;}
+
+  // Camera
+  renderer.domElement.addEventListener('touchstart', e=>{e.preventDefault();for(let i=0;i<e.changedTouches.length;i++){if(lookId===null&&e.changedTouches[i].target===renderer.domElement){lookId=e.changedTouches[i].identifier;lastLook={x:e.changedTouches[i].clientX,y:e.changedTouches[i].clientY};}}},{passive:false});
+  renderer.domElement.addEventListener('touchmove', e=>{e.preventDefault();if(lookId===null)return;for(let i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===lookId){const t=e.changedTouches[i];camAngle.yaw-=(t.clientX-lastLook.x)*0.004;camAngle.pitch-=(t.clientY-lastLook.y)*0.004;camAngle.pitch=Math.max(-1.5,Math.min(1.5,camAngle.pitch));lastLook={x:t.clientX,y:t.clientY};}}},{passive:false});
+  const endLook = e => {for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===lookId)lookId=null;};
+  renderer.domElement.addEventListener('touchend',endLook);
+
+  // Buttons
+  els.btnJump.addEventListener('touchstart', e=>{e.preventDefault();if(playerBody&&Math.abs(playerBody.velocity.y)<1)playerBody.velocity.y=CFG.player.jump;});
+  els.btnDist.addEventListener('touchstart', e=>{e.preventDefault();currentDist=(currentDist===CFG.dist.near)?CFG.dist.far:CFG.dist.near;els.distLabel.textContent=(currentDist===CFG.dist.near)?"近":"遠";showMsg(`射程: ${els.distLabel.textContent}`,"#fff");});
+  els.modeBtn.addEventListener('touchstart',e=>{e.preventDefault(); e.stopPropagation(); isPhysMode = !isPhysMode; els.modeBtn.textContent = isPhysMode ? "モード: 顕現" : "モード: 幽体"; els.modeBtn.className = isPhysMode ? "phys" : "ghost"; els.btnDraw.style.background = isPhysMode ? "linear-gradient(135deg, #FFD700, #FF8C00)" : "linear-gradient(135deg, #03a9f4, #0288d1)"; els.btnDraw.innerHTML = isPhysMode ? "顕<br><span style='font-size:10px'>Hold</span>" : "結<br><span style='font-size:10px'>Hold</span>"; showMsg(isPhysMode ? "物理顕現モード" : "幽体結界モード", "#fff");});
+
+  // Action Buttons
+  els.btnAct.addEventListener('touchstart', e=>{e.preventDefault();if(actId!==null)return;const t=e.changedTouches[0];actId=t.identifier;actStartPos={x:t.clientX,y:t.clientY};});
+  els.btnAct.addEventListener('touchend', e=>{e.preventDefault();for(let i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===actId){const t=e.changedTouches[i];if(Math.hypot(t.clientX-actStartPos.x,t.clientY-actStartPos.y)>20)actionKai();else actionMetsu();actId=null;}}});
+
+  // Draw Button
+  els.btnDraw.addEventListener('touchstart', e=>{
+    e.preventDefault(); if(drawId!==null)return; if(kekkaiList.length>=CFG.kekkai.max){showMsg("上限到達","#f44");return;}
+    const t=e.changedTouches[0]; drawId=t.identifier; els.btnDraw.classList.add('drawing');
+    if(isPhysMode) { activePhysKekkai = createActiveKekkai(true); activePhysKekkai.startX=t.clientX; activePhysKekkai.startY=t.clientY; }
+    else { drawState.active=true; drawState.startX=t.clientX; drawState.startY=t.clientY; const gg=new THREE.BoxGeometry(1,1,1),gm=new THREE.MeshBasicMaterial({color:CFG.colors.ghost,wireframe:true}); drawState.ghost=new THREE.Mesh(gg,gm); drawState.ghost.position.copy(aimMarker.position); drawState.ghost.rotation.y=camAngle.yaw; scene.add(drawState.ghost); }
+  });
+  els.btnDraw.addEventListener('touchmove', e=>{
+    e.preventDefault(); if(drawId===null)return;
+    for(let i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===drawId){
+      const t=e.changedTouches[i];
+      if(isPhysMode && activePhysKekkai) { const dx=Math.abs(t.clientX-activePhysKekkai.startX)*0.06, dy=(activePhysKekkai.startY-t.clientY)*0.06; updateActiveKekkai(activePhysKekkai, dx, dy); }
+      else if(drawState.active && drawState.ghost) { const dx=Math.abs(t.clientX-drawState.startX)*0.06, dy=(drawState.startY-t.clientY)*0.06; const sxz=1.0+Math.max(0,dx), sy=1.0+Math.max(0,dy); drawState.ghost.scale.set(sxz,sy,sxz); drawState.ghost.position.y=aimMarker.position.y+(sy/2-0.5); }
+    }}
+  });
+  els.btnDraw.addEventListener('touchend', e=>{
+    e.preventDefault(); for(let i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===drawId){
+      if(isPhysMode && activePhysKekkai) { finalizeKekkai(activePhysKekkai); activePhysKekkai=null; }
+      else if(drawState.ghost) { createKekkai(drawState.ghost.position,drawState.ghost.scale,drawState.ghost.rotation.y); scene.remove(drawState.ghost); drawState.ghost=null; drawState.active=false; }
+      drawId=null; els.btnDraw.classList.remove('drawing');
+    }}
+  });
 }
 
-function spawnText(s, p, c) {
-  const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 64;
-  const ctx = cvs.getContext('2d'); ctx.font = "bold 48px sans-serif"; ctx.fillStyle = c; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s, 32, 32);
-  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cvs), transparent: true }));
-  sp.position.copy(p); sp.scale.set(3, 3, 3); scene.add(sp);
-  let f = 0; const a = () => { f += 0.03; sp.position.y += 0.05; sp.material.opacity = 1 - f; if (f < 1) requestAnimationFrame(a); else { scene.remove(sp); sp.material.map.dispose(); } }; a();
-}
-
-function spawnParticle(p, n, c) {
-  const g = new THREE.BoxGeometry(0.25, 0.25, 0.25), m = new THREE.MeshBasicMaterial({ color: c });
-  for (let i = 0; i < n; i++) {
-    const me = new THREE.Mesh(g, m); me.position.copy(p).add(new THREE.Vector3((Math.random() - .5) * 2, (Math.random() - .5) * 2, (Math.random() - .5) * 2)); scene.add(me);
-    const v = new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(1.5);
-    const a = () => { me.position.add(v); me.scale.multiplyScalar(0.92); if (me.scale.x > 0.05) requestAnimationFrame(a); else scene.remove(me); }; a();
-  }
-}
-
+// --- Logic ---
 function takeDamage(val) {
   gameState.playerHp = Math.max(0, gameState.playerHp - val);
   els.hpText.textContent = gameState.playerHp;
@@ -179,15 +266,33 @@ function takeDamage(val) {
   els.dmgOverlay.style.opacity = 0.5; setTimeout(() => els.dmgOverlay.style.opacity = 0, 150);
   if (gameState.playerHp <= 0) showMsg("GAME OVER", "#f00");
 }
-
 function healPlayer(val) {
   gameState.playerHp = Math.min(CFG.player.maxHp, gameState.playerHp + val);
   els.hpText.textContent = gameState.playerHp; els.hpBar.style.width = (gameState.playerHp / CFG.player.maxHp * 100) + "%";
   showMsg("RECOVER!", "#0f0");
 }
-
-// --- 結界ロジック ---
-
+function updateHUD() {
+  els.wVal.textContent = gameState.wave; els.kVal.textContent = gameState.kills; els.tVal.textContent = gameState.req; 
+  if(els.kekVal) els.kekVal.textContent = kekkaiList.length;
+}
+function showMsg(t, c) {
+  els.msg.textContent = t; els.msg.style.color = c; els.msg.style.opacity = 1; setTimeout(() => els.msg.style.opacity = 0, 800);
+}
+function spawnText(s, p, c) {
+  const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 64;
+  const ctx = cvs.getContext('2d'); ctx.font = "bold 48px sans-serif"; ctx.fillStyle = c; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s, 32, 32);
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cvs), transparent: true }));
+  sp.position.copy(p); sp.scale.set(3, 3, 3); scene.add(sp);
+  let f = 0; const a = () => { f += 0.03; sp.position.y += 0.05; sp.material.opacity = 1 - f; if (f < 1) requestAnimationFrame(a); else { scene.remove(sp); sp.material.map.dispose(); } }; a();
+}
+function spawnParticle(p, n, c) {
+  const g = new THREE.BoxGeometry(0.25, 0.25, 0.25), m = new THREE.MeshBasicMaterial({ color: c });
+  for (let i = 0; i < n; i++) {
+    const me = new THREE.Mesh(g, m); me.position.copy(p).add(new THREE.Vector3((Math.random() - .5) * 2, (Math.random() - .5) * 2, (Math.random() - .5) * 2)); scene.add(me);
+    const v = new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(1.5);
+    const a = () => { me.position.add(v); me.scale.multiplyScalar(0.92); if (me.scale.x > 0.05) requestAnimationFrame(a); else scene.remove(me); }; a();
+  }
+}
 function updateAimMarker() {
   if(!playerGroup || !aimMarker) return;
   const e = new THREE.Euler(camAngle.pitch, camAngle.yaw, 0, 'YXZ');
@@ -196,6 +301,7 @@ function updateAimMarker() {
   p.y = Math.max(0.5, p.y); aimMarker.position.copy(p);
 }
 
+// Active Kekkai
 function createActiveKekkai(isPhysical) {
   const p = aimMarker.position.clone(), r = camAngle.yaw;
   const g = new THREE.BoxGeometry(1, 1, 1);
@@ -214,12 +320,7 @@ function createActiveKekkai(isPhysical) {
 }
 
 function updateActiveKekkai(k, dx, dy) {
-  // 感度100倍！
-  const sensitivity = 100.0; 
-  const sx = 1.0 + Math.max(0, dx * sensitivity);
-  const sy = 1.0 + Math.max(0, dy * sensitivity);
-  const sz = sx; 
-  
+  const sx = 1.0 + Math.max(0, dx * 100), sy = 1.0 + Math.max(0, dy * 100), sz = sx; // Sensitivity * 100
   k.currentS = { x: sx, y: sy, z: sz };
   k.mesh.scale.set(sx, sy, sz);
   const newY = k.startP.y + (sy - 1.0) / 2; 
@@ -253,10 +354,7 @@ function createKekkai(p, s, r) {
   kekkaiList.push({ body: b, mesh: mesh, shrinking: false }); spawnText("結", p, "#0ff"); updateHUD();
 }
 
-function removeKekkai(k) {
-  scene.remove(k.mesh); world.removeBody(k.body); kekkaiList = kekkaiList.filter(o => o !== k); updateHUD();
-}
-
+function removeKekkai(k) { scene.remove(k.mesh); world.removeBody(k.body); kekkaiList = kekkaiList.filter(o => o !== k); updateHUD(); }
 function actionMetsu() {
   let t = null, minD = 999; kekkaiList.forEach(k => { const d = playerBody.position.distanceTo(k.body.position); if (d < minD) { minD = d; t = k; } });
   if (!t || t.shrinking) { showMsg("対象なし", "#888"); return; }
@@ -264,25 +362,16 @@ function actionMetsu() {
   const bbox = new THREE.Box3().setFromObject(t.mesh); let sc = 1.0;
   const loop = () => {
     if (!kekkaiList.includes(t)) return; sc -= 0.05; t.mesh.scale.setScalar(sc);
-    enemies.forEach(e => {
-      if (bbox.containsPoint(e.mesh.position)) {
-        const d = t.body.position.vsub(e.body.position); e.body.velocity.set(d.x * 8, d.y * 8, d.z * 8);
-        if (sc < 0.4) killEnemy(e);
-      }
-    });
+    enemies.forEach(e => { if (bbox.containsPoint(e.mesh.position)) { const d = t.body.position.vsub(e.body.position); e.body.velocity.set(d.x * 8, d.y * 8, d.z * 8); if (sc < 0.4) killEnemy(e); } });
     if (sc <= 0.1) { removeKekkai(t); spawnParticle(t.mesh.position, 30, 0xffaa00); } else requestAnimationFrame(loop);
   }; loop();
 }
-
 function actionKai() { const t = kekkaiList[kekkaiList.length - 1]; if (t) { showMsg("解", "#4f8"); spawnText("解", t.mesh.position, "#4f8"); removeKekkai(t); } else showMsg("結界なし", "#888"); }
 
-// --- Game Logic ---
 function spawnEnemy() {
   if (enemies.length >= 6 + gameState.wave) return;
   const r = Math.random(); let x, y, z; const fW = CFG.field.width, fD = CFG.field.depth;
-  if (r < 0.6) { x = (Math.random() - .5) * fW; z = (Math.random() - .5) * fD; y = 20; }
-  else if (r < 0.8) { x = (Math.random() - .5) * (fW - 5); z = (-fD / 2 - 20) + (Math.random() - .5) * 30; y = 35; }
-  else { x = (fW / 2 - 25) + (Math.random() - .5) * 20; z = (Math.random() - .5) * 50; y = 10; }
+  if (r < 0.6) { x = (Math.random() - .5) * fW; z = (Math.random() - .5) * fD; y = 20; } else if (r < 0.8) { x = (Math.random() - .5) * (fW - 5); z = (-fD / 2 - 20) + (Math.random() - .5) * 30; y = 35; } else { x = (fW / 2 - 25) + (Math.random() - .5) * 20; z = (Math.random() - .5) * 50; y = 10; }
   if (Math.random() < 0.2) spawnGiant(x, y, z);
   else {
     const sz = 0.6 + Math.random() * 0.8, cl = new THREE.Color().setHSL(Math.random(), 0.8, 0.5), ms = 15 * sz;
@@ -330,128 +419,110 @@ function startVipMission() {
   vip = { body: b, mesh: g, hp: 100, goal: new CANNON.Vec3(0, 5, -CFG.field.depth / 2 + 30) };
 }
 
-// --- Initialization ---
-function init() {
-  try {
-    scene = new THREE.Scene(); scene.background = new THREE.Color(CFG.colors.sky); 
-    scene.fog = new THREE.FogExp2(CFG.colors.sky, 0.005);
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
-    playerGroup = new THREE.Group(); playerGroup.add(camera); 
-    camera.position.set(0, CFG.player.height, 0); scene.add(playerGroup);
+function setupEnvironment(mat){
+  const sun=new THREE.DirectionalLight(0xffffee,1.2); sun.position.set(-50,100,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); sun.shadow.camera.left=-100; sun.shadow.camera.right=100; sun.shadow.camera.top=100; sun.shadow.camera.bottom=-100; scene.add(sun); scene.add(new THREE.AmbientLight(0x555566,0.6));
+  const gGeo=new THREE.PlaneGeometry(CFG.field.width+40,CFG.field.depth+40); const gMat=new THREE.MeshStandardMaterial({color:CFG.colors.ground,roughness:0.9});
+  const ground=new THREE.Mesh(gGeo,gMat); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+  const gBody=new CANNON.Body({mass:0,material:mat}); gBody.addShape(new CANNON.Plane()); gBody.quaternion.setFromEuler(-Math.PI/2,0,0); world.addBody(gBody);
+
+  const createBox=(x,y,z,w,h,d,col,tr=false,op=1)=>{
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:col,transparent:tr,opacity:op})); m.position.set(x,y,z); m.castShadow=!tr; m.receiveShadow=true; scene.add(m);
+    const b=new CANNON.Body({mass:0,material:mat}); b.addShape(new CANNON.Box(new CANNON.Vec3(w/2,h/2,d/2))); b.position.copy(m.position); world.addBody(b); return m;
+  };
+  const FW=CFG.field.width,FD=CFG.field.depth,WH=8;
+  createBox(0,WH/2,FD/2+1,FW+2,WH,2,CFG.colors.wall); createBox(-FW/2-1,WH/2,0,2,WH,FD+2,CFG.colors.wall); createBox(FW/2+1,WH/2,0,2,WH,FD+2,CFG.colors.wall);
+  const bH=30,bZ=-FD/2-20; createBox(0,bH/2,bZ,FW,bH,40,CFG.colors.building);
+  for(let i=-FW/2+5;i<FW/2;i+=10)for(let j=5;j<28;j+=7){const w=new THREE.Mesh(new THREE.PlaneGeometry(4,4),new THREE.MeshBasicMaterial({color:0x87CEFA})); w.position.set(i,j,bZ+20+0.1); scene.add(w);}
+
+  const stW=8, stRun=60, stRise=30, stZ=bZ+20+stW/2, slopeThickness=1.0, midY=stRise/2 - slopeThickness/2;
+  const createSlope = (startX, endX) => {
+    const run = Math.abs(endX - startX), len = Math.sqrt(run*run + stRise*stRise), ang = Math.atan2(stRise, run), midX = (startX + endX)/2;
+    const b=new CANNON.Body({mass:0,material:mat}); b.addShape(new CANNON.Box(new CANNON.Vec3(len/2, slopeThickness/2, stW/2))); b.position.set(midX, midY, stZ);
+    const dir = (endX > startX) ? 1 : -1; b.quaternion.setFromEuler(0, 0, dir * ang); world.addBody(b);
+    const m=new THREE.Mesh(new THREE.BoxGeometry(len,slopeThickness,stW), new THREE.MeshStandardMaterial({color:0xdddddd})); m.position.copy(b.position); m.quaternion.copy(b.quaternion); m.receiveShadow=true; m.castShadow=true; scene.add(m);
+    const r=new THREE.Mesh(new THREE.BoxGeometry(len,0.5,0.2), new THREE.MeshStandardMaterial({color:0x888888})); r.position.copy(b.position); r.position.add(new THREE.Vector3(0, slopeThickness/2+2.0, 0).applyEuler(new THREE.Euler(0,0,dir*ang))); r.position.z += stW/2 - 0.2; r.quaternion.copy(b.quaternion); scene.add(r);
     
-    renderer = new THREE.WebGLRenderer({ antialias: true }); 
-    renderer.setSize(window.innerWidth, window.innerHeight); 
-    renderer.shadowMap.enabled = true; 
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
-    renderer.xr.enabled = true; 
-    renderer.xr.setReferenceSpaceType('local-floor');
-    document.body.appendChild(renderer.domElement);
+    // 踊り場
+    const landW=6;
+    createBox(startX - dir*(landW/2), 0.25, stZ, landW, 0.5, stW, 0xdddddd);
+    const topX = endX + dir*(landW/2);
+    createBox(topX, stRise, stZ, landW, 0.5, stW, 0xdddddd);
+    createBox(topX, stRise, (stZ+(bZ+20))/2-10, landW, 0.5, 25, 0xdddddd);
+    createBox(topX + dir*(landW/2), stRise+1.5, stZ, 0.2, 3, stW, 0x888888);
+    createBox(topX, stRise+1.5, stZ+stW/2, landW, 3, 0.2, 0x888888);
+  };
+  createSlope(5, 55); createSlope(-5, -55);
 
-    const vrButton = VRButton.createButton(renderer);
-    document.body.appendChild(vrButton);
-    document.getElementById('vrBtn').style.display='none'; 
+  const rY=bH, rW=FW, rD=40; createBox(0,rY+1,bZ-rD/2,rW,2,0.5,0x888888); createBox(-rW/2,rY+1,bZ,0.5,2,rD,0x888888); createBox(rW/2,rY+1,bZ,0.5,2,rD,0x888888);
+  const gateW=8, rightGateX=55, leftGateX=-55;
+  const centerFenceW=(rightGateX-gateW/2)-(leftGateX+gateW/2); createBox(0,rY+1,bZ+rD/2,centerFenceW,2,0.5,0x888888);
+  const leftFenceW=(leftGateX-gateW/2)-(-rW/2); createBox(-rW/2+leftFenceW/2,rY+1,bZ+rD/2,leftFenceW,2,0.5,0x888888);
+  const rightFenceW=(rW/2)-(rightGateX+gateW/2); createBox(rW/2-rightFenceW/2,rY+1,bZ+rD/2,rightFenceW,2,0.5,0x888888);
 
-    renderer.xr.addEventListener('sessionstart', () => {
-      document.getElementById('uiLayer').style.display = 'none';
-      document.getElementById('centerReticle').style.display = 'none';
-      isPhysMode = false; // Reset to ghost mode in VR
-    });
-    renderer.xr.addEventListener('sessionend', () => {
-      document.getElementById('uiLayer').style.display = 'block';
-      document.getElementById('centerReticle').style.display = 'block';
-    });
+  const pX=FW/2-25, pZ=0, pW=30, pD=60, wT=1.0;
+  createBox(pX,1.0,pZ,pW,2.0,pD,CFG.colors.pool); createBox(pX,3.0,pZ-pD/2,pW,2.0,wT,CFG.colors.pool); createBox(pX,3.0,pZ+pD/2,pW,2.0,wT,CFG.colors.pool); createBox(pX-pW/2,3.0,pZ,wT,2.0,pD,CFG.colors.pool); createBox(pX+pW/2,3.0,pZ,wT,2.0,pD,CFG.colors.pool);
+  const wtMat=new THREE.MeshBasicMaterial({color:0x00aaff, transparent:true, opacity:0.6, side:THREE.DoubleSide}), wt=new THREE.Mesh(new THREE.PlaneGeometry(pW-wT*2,pD-wT*2), wtMat);
+  wt.rotation.x=-Math.PI/2; wt.position.set(pX,3.0,pZ); scene.add(wt);
+  
+  const psW=4, psL=20, psX=pX-pW/2-psW/2, psZ=pZ, psH=3.0, psAng=Math.atan2(psH, psL);
+  const psThickness=0.4, psB=new CANNON.Body({mass:0,material:mat});
+  psB.addShape(new CANNON.Box(new CANNON.Vec3(psW/2, psThickness/2, Math.sqrt(psL*psL+psH*psH)/2)));
+  psB.position.set(psX, psH/2-psThickness/2, psZ); psB.quaternion.setFromEuler(-psAng,0,0); world.addBody(psB);
+  const psM=new THREE.Mesh(new THREE.BoxGeometry(psW,psThickness,Math.sqrt(psL*psL+psH*psH)), new THREE.MeshStandardMaterial({color:0xcccccc}));
+  psM.position.copy(psB.position); psM.quaternion.copy(psB.quaternion); psM.receiveShadow=true; scene.add(psM);
 
-    world = new CANNON.World(); world.gravity.set(0, -30, 0);
-    const mDef=new CANNON.Material('def'), mPly=new CANNON.Material('ply'), mEne=new CANNON.Material('ene'), mKek=new CANNON.Material('kek');
-    
-    world.addContactMaterial(new CANNON.ContactMaterial(mPly, mDef, { friction: 0.0, restitution: 0.0 }));
-    world.addContactMaterial(new CANNON.ContactMaterial(mEne, mDef, { friction: 0.5, restitution: 0.3 }));
-    world.addContactMaterial(new CANNON.ContactMaterial(mKek, mEne, { friction: 0.1, restitution: 0.8 }));
-    world.addContactMaterial(new CANNON.ContactMaterial(mKek, mPly, { friction: 0.8, restitution: 0.0 }));
-    world.addContactMaterial(new CANNON.ContactMaterial(mPly, mEne, { friction: 0.5, restitution: 0.5 }));
-
-    playerBody = new CANNON.Body({ mass: 70, shape: new CANNON.Sphere(0.6), material: mPly, fixedRotation: true, linearDamping: 0.9 });
-    playerBody.position.set(0, 5, 30); world.addBody(playerBody);
-    playerBody.addEventListener('collide', (e) => {
-      if (e.body && e.body.material && e.body.material.name === 'ene') {
-        const relVel = e.contact.getImpactVelocityAlongNormal();
-        if (Math.abs(relVel) > 2.0) {
-          takeDamage(Math.floor(Math.abs(relVel) * 2));
-          const normal = new CANNON.Vec3(); e.contact.ni.negate(normal);
-          playerBody.applyImpulse(normal.scale(50 * Math.abs(relVel)), playerBody.position);
-        }
-      }
-    });
-
-    setupEnvironment(mDef);
-    const aimGeo = new THREE.SphereGeometry(0.3, 16, 16);
-    const aimMat = new THREE.MeshBasicMaterial({ color: CFG.colors.marker, transparent: true, opacity: 0.7, depthTest: false });
-    aimMarker = new THREE.Mesh(aimGeo, aimMat); aimMarker.renderOrder = 999; scene.add(aimMarker);
-
-    setupInputs(); 
-    for (let i = 0; i < 3; i++) spawnEnemy(); 
-    renderer.setAnimationLoop(loop);
-
-  } catch (e) { console.error(e); alert("初期化エラー: " + e.message); }
+  const pfH=1.5, pOutW=pW+2, pOutD=pD+2; const cf=(x,z,w,d)=>{const f=new THREE.Mesh(new THREE.BoxGeometry(w,pfH,d),new THREE.MeshStandardMaterial({color:0xdddddd,transparent:true,opacity:0.3}));f.position.set(x,2.0+pfH/2,z);scene.add(f);const b=new CANNON.Body({mass:0});b.addShape(new CANNON.Box(new CANNON.Vec3(w/2,pfH/2,d/2)));b.position.copy(f.position);world.addBody(b);};
+  cf(pX+pOutW/2, pZ, 0.2, pOutD); cf(pX, pZ-pOutD/2, pOutW, 0.2); cf(pX, pZ+pOutD/2, pOutW, 0.2);
+  const gap=14; cf(pX-pOutW/2, pZ-(pD/2+gap)/2, 0.2, pD/2-gap); cf(pX-pOutW/2, pZ+(pD/2+gap)/2, 0.2, pD/2-gap);
+  const gZ=FD/2; createBox(-15,5,gZ,5,10,5,0x888888); createBox(15,5,gZ,5,10,5,0x888888); createBox(0,4,gZ,25,8,1,0x555555);
 }
 
-// Loop
-function loop(t) {
-  const dt = Math.min((t - lastT) / 1000, 0.1); lastT = t;
-  world.step(1 / 60, dt, 3);
-  
-  if (renderer.xr.isPresenting) {
-    const s = renderer.xr.getSession();
-    if (s) {
-      for (const src of s.inputSources) {
-        if (!src.gamepad) continue; const gp = src.gamepad;
-        
-        if (src.handedness === 'left') {
-           // Left Stick: Move
+function loop(t){
+  const dt=Math.min((t-lastT)/1000,0.1); lastT=t;
+  world.step(1/60, dt, 3);
+  if(renderer.xr.isPresenting){
+    const s=renderer.xr.getSession();
+    if(s){
+      for(const src of s.inputSources){
+        if(!src.gamepad)continue;const gp=src.gamepad;
+        if(src.handedness==='left'){
+           // 移動
            if(gp.axes.length>=4){input.x=gp.axes[2];input.y=gp.axes[3];}
-           // Left X (button 3 or 4 depending on browser mapping, standard is 3=X)
-           // Checking buttons 3,4,5 covering A/B/X/Y usually. X is typically button index 3 on Oculus browser for left controller? 
-           // Let's use generic check or try 3.
-           if(gp.buttons[3] && gp.buttons[3].pressed && Math.abs(playerBody.velocity.y)<1) playerBody.velocity.y=CFG.player.jump;
-
-           // Left Grip (button 1): Phys Kekkai
-           if(gp.buttons[1] && gp.buttons[1].pressed){
+           // ジャンプ (X: button 3)
+           if(gp.buttons[3]?.pressed&&Math.abs(playerBody.velocity.y)<1)playerBody.velocity.y=CFG.player.jump;
+           
+           // 左グリップ(1): 顕現結界
+           if(gp.buttons[1]?.pressed){
              if(!activePhysKekkai && !drawState.active){
-               activePhysKekkai = createActiveKekkai(true);
-               activePhysKekkai.startPos = activePhysKekkai.mesh.position.clone(); // Initial pos
-               // For gesture, we need reference. Using head position as simplified gesture origin if hand tracking is complex
-               // Or simply use the controller's grip position logic.
-               // Since we don't have previous frame data easily here without state, let's use Time based * 100 sensitivity again?
-               // The user asked for "move controller to expand". 
-               // We need to track start controller pos.
-               // Since `src` doesn't give pos directly without frame reference...
-               // We will use a simplified "Time * Sensitivity" approach again as fallback for stability
-               // OR stick to the previous request's logic if possible.
-               // Let's use Stick expansion for precision? No, "Gesture".
-               // OK, Reverting to Time-based expansion with HIGH speed to simulate gesture power.
+               activePhysKekkai=createActiveKekkai(true);
              }
              if(activePhysKekkai){
-                const expand = 0.05 * 100; // 100x speed
-                const sx=activePhysKekkai.currentS.x+expand*dt, sy=activePhysKekkai.currentS.y+expand*dt;
-                updateActiveKekkai(activePhysKekkai, sx-1, sy-1);
-                activePhysKekkai.body.position.copy(aimMarker.position).y += (activePhysKekkai.currentS.y/2);
-                activePhysKekkai.mesh.position.copy(activePhysKekkai.body.position);
+               // 感度100倍で拡大 (フレーム依存を避けるため時間でも補正可能だが、ここでは簡易的に)
+               // コントローラー位置差分を取るのは難しいので、スティック入力や時間経過で拡大させる簡易実装にするか、
+               // もしくは「グリップを押しながら手を動かす」を実現するにはコントローラー位置の前フレーム保存が必要。
+               // 簡易実装として「グリップ中は自動で高速拡大」させるのが一番安定する。
+               const expand = 0.05 * 5; // 高速拡大
+               const sx=activePhysKekkai.currentS.x+expand, sy=activePhysKekkai.currentS.y+expand;
+               updateActiveKekkai(activePhysKekkai, sx-1, sy-1);
+               activePhysKekkai.body.position.copy(aimMarker.position).y+=(activePhysKekkai.currentS.y/2);
+               activePhysKekkai.mesh.position.copy(activePhysKekkai.body.position);
              }
            } else {
              if(activePhysKekkai){ finalizeKekkai(activePhysKekkai); activePhysKekkai=null; }
            }
 
-           // Left Trigger (button 0): Kai
-           if(gp.buttons[0] && gp.buttons[0].pressed && !vrState.lastActL) actionKai();
-           vrState.lastActL = gp.buttons[0]?.pressed;
+           // 左トリガー(0): 解
+           const kai=gp.buttons[0]?.pressed;
+           if(kai && !vrState.lastActL) actionKai();
+           vrState.lastActL=kai;
         }
 
-        if (src.handedness === 'right') {
-           // Right Stick: Rotate
-           if(gp.axes.length>=4 && Math.abs(gp.axes[2])>0.5) camAngle.yaw -= gp.axes[2]*0.04;
+        if(src.handedness==='right'){
+           // 視点
+           if(gp.axes.length>=4 && Math.abs(gp.axes[2])>0.5) camAngle.yaw-=gp.axes[2]*0.04;
            
-           // Right Grip (button 1): Ghost Kekkai
-           if(gp.buttons[1] && gp.buttons[1].pressed){
+           // 右グリップ(1): ゴースト結界
+           if(gp.buttons[1]?.pressed){
               if(!drawState.active && !activePhysKekkai && kekkaiList.length<CFG.kekkai.max){
                  drawState.active=true; 
                  const gg=new THREE.BoxGeometry(1,1,1),gm=new THREE.MeshBasicMaterial({color:CFG.colors.ghost,wireframe:true}); 
@@ -459,8 +530,8 @@ function loop(t) {
                  drawState.ghost.currentS={x:1,y:1,z:1};
               }
               if(drawState.ghost){
-                 const expand = 0.05 * 100; // 100x
-                 const s = drawState.ghost.scale.x + expand*dt;
+                 const expand = 0.05 * 5; // 高速拡大
+                 const s = drawState.ghost.scale.x + expand;
                  drawState.ghost.scale.set(s,s,s);
                  drawState.ghost.position.copy(aimMarker.position).y += (s/2 - 0.5);
                  drawState.ghost.rotation.y = camAngle.yaw;
@@ -473,14 +544,15 @@ function loop(t) {
               }
            }
 
-           // Right Trigger (button 0): Metsu
-           if(gp.buttons[0] && gp.buttons[0].pressed && !vrState.lastAct) actionMetsu();
-           vrState.lastAct = gp.buttons[0]?.pressed;
+           // 右トリガー(0): 滅
+           const act=gp.buttons[0]?.pressed;
+           if(act && !vrState.lastAct) actionMetsu();
+           vrState.lastAct=act;
 
-           // Right A (4) / B (5)
-           if(gp.buttons[4] && gp.buttons[4].pressed && !vrState.lastDist){ currentDist=CFG.dist.near; showMsg("距離：近", "#fff"); }
-           if(gp.buttons[5] && gp.buttons[5].pressed && !vrState.lastDist){ currentDist=CFG.dist.far; showMsg("距離：遠", "#fff"); }
-           vrState.lastDist = gp.buttons[4]?.pressed || gp.buttons[5]?.pressed;
+           // A(4) / B(5): 距離
+           const distA=gp.buttons[4]?.pressed; if(distA && !vrState.lastDist){ currentDist=CFG.dist.near; showMsg("距離：近", "#fff"); }
+           const distB=gp.buttons[5]?.pressed; if(distB && !vrState.lastDist){ currentDist=CFG.dist.far; showMsg("距離：遠", "#fff"); }
+           vrState.lastDist = distA || distB;
         }
       }
     }
@@ -520,64 +592,6 @@ function loop(t) {
   });
   renderer.render(scene,camera);
 }
-
-// Environment Setup (Condensed for brevity, same as previous)
-function setupEnvironment(mat){
-  const sun=new THREE.DirectionalLight(0xffffee,1.2); sun.position.set(-50,100,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); scene.add(sun); scene.add(new THREE.AmbientLight(0x555566,0.6));
-  const gGeo=new THREE.PlaneGeometry(CFG.field.width+40,CFG.field.depth+40); const gMat=new THREE.MeshStandardMaterial({color:CFG.colors.ground,roughness:0.9});
-  const ground=new THREE.Mesh(gGeo,gMat); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
-  const gBody=new CANNON.Body({mass:0,material:mat}); gBody.addShape(new CANNON.Plane()); gBody.quaternion.setFromEuler(-Math.PI/2,0,0); world.addBody(gBody);
-
-  const createBox=(x,y,z,w,h,d,col,tr=false,op=1)=>{
-    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:col,transparent:tr,opacity:op})); m.position.set(x,y,z); m.castShadow=!tr; m.receiveShadow=true; scene.add(m);
-    const b=new CANNON.Body({mass:0,material:mat}); b.addShape(new CANNON.Box(new CANNON.Vec3(w/2,h/2,d/2))); b.position.copy(m.position); world.addBody(b); return m;
-  };
-  const FW=CFG.field.width,FD=CFG.field.depth,WH=8;
-  createBox(0,WH/2,FD/2+1,FW+2,WH,2,CFG.colors.wall); createBox(-FW/2-1,WH/2,0,2,WH,FD+2,CFG.colors.wall); createBox(FW/2+1,WH/2,0,2,WH,FD+2,CFG.colors.wall);
-  const bH=30,bZ=-FD/2-20; createBox(0,bH/2,bZ,FW,bH,40,CFG.colors.building);
-  for(let i=-FW/2+5;i<FW/2;i+=10)for(let j=5;j<28;j+=7){const w=new THREE.Mesh(new THREE.PlaneGeometry(4,4),new THREE.MeshBasicMaterial({color:0x87CEFA})); w.position.set(i,j,bZ+20+0.1); scene.add(w);}
-
-  const stW=8, stRun=60, stRise=30, stZ=bZ+20+stW/2, slopeThickness=1.0, midY=stRise/2 - slopeThickness/2;
-  const createSlope = (startX, endX) => {
-    const run = Math.abs(endX - startX), len = Math.sqrt(run*run + stRise*stRise), ang = Math.atan2(stRise, run), midX = (startX + endX)/2;
-    const b=new CANNON.Body({mass:0,material:mat}); b.addShape(new CANNON.Box(new CANNON.Vec3(len/2, slopeThickness/2, stW/2))); b.position.set(midX, midY, stZ);
-    const dir = (endX > startX) ? 1 : -1; b.quaternion.setFromEuler(0, 0, dir * ang); world.addBody(b);
-    const m=new THREE.Mesh(new THREE.BoxGeometry(len,slopeThickness,stW), new THREE.MeshStandardMaterial({color:0xdddddd})); m.position.copy(b.position); m.quaternion.copy(b.quaternion); m.receiveShadow=true; m.castShadow=true; scene.add(m);
-    const r=new THREE.Mesh(new THREE.BoxGeometry(len,0.5,0.2), new THREE.MeshStandardMaterial({color:0x888888})); r.position.copy(b.position); r.position.add(new THREE.Vector3(0, slopeThickness/2+2.0, 0).applyEuler(new THREE.Euler(0,0,dir*ang))); r.position.z += stW/2 - 0.2; r.quaternion.copy(b.quaternion); scene.add(r);
-    const landW=6;
-    createBox(startX - dir*(landW/2), 0.25, stZ, landW, 0.5, stW, 0xdddddd);
-    const topX = endX + dir*(landW/2);
-    createBox(topX, stRise, stZ, landW, 0.5, stW, 0xdddddd);
-    createBox(topX, stRise, (stZ+(bZ+20))/2-10, landW, 0.5, 25, 0xdddddd);
-    createBox(topX + dir*(landW/2), stRise+1.5, stZ, 0.2, 3, stW, 0x888888);
-    createBox(topX, stRise+1.5, stZ+stW/2, landW, 3, 0.2, 0x888888);
-  };
-  createSlope(5, 55); createSlope(-5, -55);
-
-  const rY=bH, rW=FW, rD=40; createBox(0,rY+1,bZ-rD/2,rW,2,0.5,0x888888); createBox(-rW/2,rY+1,bZ,0.5,2,rD,0x888888); createBox(rW/2,rY+1,bZ,0.5,2,rD,0x888888);
-  const gateW=8, rightGateX=55, leftGateX=-55;
-  const centerFenceW=(rightGateX-gateW/2)-(leftGateX+gateW/2); createBox(0,rY+1,bZ+rD/2,centerFenceW,2,0.5,0x888888);
-  const leftFenceW=(leftGateX-gateW/2)-(-rW/2); createBox(-rW/2+leftFenceW/2,rY+1,bZ+rD/2,leftFenceW,2,0.5,0x888888);
-  const rightFenceW=(rW/2)-(rightGateX+gateW/2); createBox(rW/2-rightFenceW/2,rY+1,bZ+rD/2,rightFenceW,2,0.5,0x888888);
-
-  const pX=FW/2-25, pZ=0, pW=30, pD=60, wT=1.0;
-  createBox(pX,1.0,pZ,pW,2.0,pD,CFG.colors.pool); createBox(pX,3.0,pZ-pD/2,pW,2.0,wT,CFG.colors.pool); createBox(pX,3.0,pZ+pD/2,pW,2.0,wT,CFG.colors.pool); createBox(pX-pW/2,3.0,pZ,wT,2.0,pD,CFG.colors.pool); createBox(pX+pW/2,3.0,pZ,wT,2.0,pD,CFG.colors.pool);
-  const wtMat=new THREE.MeshBasicMaterial({color:0x00aaff, transparent:true, opacity:0.6, side:THREE.DoubleSide}), wt=new THREE.Mesh(new THREE.PlaneGeometry(pW-wT*2,pD-wT*2), wtMat);
-  wt.rotation.x=-Math.PI/2; wt.position.set(pX,3.0,pZ); scene.add(wt);
-  
-  const psW=4, psL=20, psX=pX-pW/2-psW/2, psZ=pZ, psH=3.0, psAng=Math.atan2(psH, psL);
-  const psThickness=0.4, psB=new CANNON.Body({mass:0,material:mat});
-  psB.addShape(new CANNON.Box(new CANNON.Vec3(psW/2, psThickness/2, Math.sqrt(psL*psL+psH*psH)/2)));
-  psB.position.set(psX, psH/2-psThickness/2, psZ); psB.quaternion.setFromEuler(-psAng,0,0); world.addBody(psB);
-  const psM=new THREE.Mesh(new THREE.BoxGeometry(psW,psThickness,Math.sqrt(psL*psL+psH*psH)), new THREE.MeshStandardMaterial({color:0xcccccc}));
-  psM.position.copy(psB.position); psM.quaternion.copy(psB.quaternion); psM.receiveShadow=true; scene.add(psM);
-
-  const pfH=1.5, pOutW=pW+2, pOutD=pD+2; const cf=(x,z,w,d)=>{const f=new THREE.Mesh(new THREE.BoxGeometry(w,pfH,d),new THREE.MeshStandardMaterial({color:0xdddddd,transparent:true,opacity:0.3}));f.position.set(x,2.0+pfH/2,z);scene.add(f);const b=new CANNON.Body({mass:0});b.addShape(new CANNON.Box(new CANNON.Vec3(w/2,pfH/2,d/2)));b.position.copy(f.position);world.addBody(b);};
-  cf(pX+pOutW/2, pZ, 0.2, pOutD); cf(pX, pZ-pOutD/2, pOutW, 0.2); cf(pX, pZ+pOutD/2, pOutW, 0.2);
-  const gap=14; cf(pX-pOutW/2, pZ-(pD/2+gap)/2, 0.2, pD/2-gap); cf(pX-pOutW/2, pZ+(pD/2+gap)/2, 0.2, pD/2-gap);
-  const gZ=FD/2; createBox(-15,5,gZ,5,10,5,0x888888); createBox(15,5,gZ,5,10,5,0x888888); createBox(0,4,gZ,25,8,1,0x555555);
-}
-
 document.getElementById('vrBtn').addEventListener('click', ()=>{ if(navigator.xr) navigator.xr.requestSession('immersive-vr').then(s=>{ renderer.xr.setSession(s); document.getElementById('uiLayer').style.display='none'; }); });
 window.onload = init;
 </script>
