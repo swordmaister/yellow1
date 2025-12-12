@@ -2,29 +2,37 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<title>真・結界師VR — 最終完成版</title>
+<title>真・結界師VR — Complete Edition</title>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover, user-scalable=no">
 <style>
   html, body { height: 100%; margin: 0; background: #87CEEB; color: #fff; font-family: sans-serif; overflow: hidden; touch-action: none; user-select: none; -webkit-user-select: none; }
   canvas { display: block; width: 100%; height: 100%; }
 
+  /* Error & Overlay */
   #error-log { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); color:#ff5555; padding:20px; z-index:9999; white-space:pre-wrap; font-weight:bold; overflow:auto; }
   #damage-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: red; opacity: 0; pointer-events: none; z-index: 50; transition: opacity 0.1s; }
 
+  /* HUD */
   #hud { position: fixed; top: 16px; left: 16px; pointer-events: none; z-index: 10; }
   @supports (padding-top: env(safe-area-inset-top)) { #hud { top: calc(env(safe-area-inset-top) + 10px); left: calc(env(safe-area-inset-left) + 16px); } }
-  
   .hud-box { background: rgba(0, 30, 60, 0.7); padding: 8px 16px; border-radius: 8px; border: 2px solid rgba(255,255,255,0.3); margin-bottom: 8px; backdrop-filter: blur(4px); min-width: 140px; }
   .big-text { font-size: 18px; font-weight: bold; color: #ffeb3b; text-shadow: 1px 1px 2px #000; }
   .sub-text { font-size: 14px; color: #e0e0e0; }
   .hp-bar-bg { width: 100%; height: 8px; background: #555; margin-top: 4px; border-radius: 4px; overflow: hidden; }
   .hp-bar-val { width: 100%; height: 100%; background: #0f0; transition: width 0.2s; }
 
+  /* Message */
   #msgArea { position: fixed; top: 35%; left: 0; width: 100%; text-align: center; pointer-events: none; z-index: 20; }
   .flash-msg { font-size: 40px; font-weight: 900; color: #fff; text-shadow: 0 0 10px #f0a, 2px 2px 0 #000; opacity: 0; transition: opacity 0.3s; }
 
-  /* UIレイヤー */
-  #uiLayer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+  /* Center Reticle (VR非表示) */
+  #centerReticle { position: fixed; top: 50%; left: 50%; width: 6px; height: 6px; background: rgba(255,255,255,0.8); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; border: 1px solid rgba(0,0,0,0.5); }
+  
+  /* VR Start Button */
+  #vrStartBtn { display:none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 220px; padding: 15px; background: rgba(0,0,0,0.8); border: 3px solid #0f0; color: #0f0; border-radius: 12px; font-size: 20px; font-weight: bold; cursor: pointer; z-index: 200; text-align: center; box-shadow: 0 0 15px #0f0; }
+
+  /* Mobile UI Layer (VR時は非表示) */
+  #mobileUI { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; transition: opacity 0.5s; }
   #stickZone { position: absolute; bottom: 40px; left: 40px; width: 140px; height: 140px; pointer-events: auto; margin-bottom: env(safe-area-inset-bottom); margin-left: env(safe-area-inset-left); }
   .stick-base { width: 100%; height: 100%; background: rgba(255,255,255,0.2); border: 2px solid rgba(255,255,255,0.5); border-radius: 50%; position: relative; }
   .stick-knob { width: 60px; height: 60px; background: #fff; border-radius: 50%; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); box-shadow: 0 4px 10px rgba(0,0,0,0.3); pointer-events: none; }
@@ -38,8 +46,6 @@
   #btnLeft { top: 50%; left: 0; transform: translateY(-50%); background: linear-gradient(135deg, #f44336, #c62828); }
   #btnRight { top: 50%; right: 0; transform: translateY(-50%); background: linear-gradient(135deg, #03a9f4, #0288d1); width: 75px; height: 75px; font-size: 18px; }
   #btnRight.drawing { background: #fff; color: #0288d1; transform: translateY(-50%) scale(1.1); }
-
-  /* モード表示 (スマホ用) */
   #modeSwitch { position: absolute; top: -60px; right: 0; width: 120px; height: 40px; background: rgba(0,0,0,0.6); border: 2px solid #fff; border-radius: 20px; display:flex; align-items:center; justify-content:center; font-size:12px; font-weight:bold; pointer-events:auto; transition: background 0.3s; }
   #modeSwitch.phys { background: linear-gradient(90deg, #FFD700, #FF8C00); color:#000; border-color:#fff; }
   #modeSwitch.ghost { background: linear-gradient(90deg, #00bfff, #0000ff); color:#fff; border-color:#00ffff; }
@@ -49,9 +55,6 @@
     #padArea { width: 170px; height: 170px; bottom: 20px; right: 20px; } .btn { width: 55px; height: 55px; font-size: 10px; }
     #btnDown, #btnRight { width: 65px; height: 65px; } .big-text { font-size: 16px; } .sub-text { font-size: 12px; }
   }
-
-  #centerReticle { position: fixed; top: 50%; left: 50%; width: 6px; height: 6px; background: rgba(255,255,255,0.8); border-radius: 50%; transform: translate(-50%, -50%); pointer-events: none; border: 1px solid rgba(0,0,0,0.5); }
-  #vrBtn { position: fixed; top: 10px; right: 10px; padding: 8px 16px; background: rgba(0,0,0,0.8); border: 2px solid #fff; color: #fff; border-radius: 6px; z-index: 200; pointer-events: auto; font-weight: bold; cursor: pointer; }
 </style>
 
 <script>
@@ -59,7 +62,6 @@
     const box = document.getElementById('error-log');
     box.style.display = 'block';
     box.textContent += "Error: " + msg + "\nLine: " + line + "\n";
-    return false;
   };
 </script>
 
@@ -90,15 +92,17 @@
   <div class="hud-box" id="vipBox" style="display:none; border-color:#0f0;">
     <span class="sub-text" style="color:#0f0;">護衛対象</span>
     <div class="hp-bar-bg"><div id="vipHpBar" class="hp-bar-val" style="background:#0ff;"></div></div>
+    <span class="sub-text" style="font-size:10px;">校門へ誘導せよ</span>
   </div>
   <div class="hud-box"><span class="sub-text">結界: <span id="kekVal" style="color:#00bfff;">0</span>/5</span></div>
 </div>
 
 <div id="msgArea"><div id="flashMsg" class="flash-msg"></div></div>
 <div id="centerReticle"></div>
-<button id="vrBtn">VR START</button>
 
-<div id="uiLayer">
+<button id="vrStartBtn">ENTER VR</button>
+
+<div id="mobileUI">
   <div id="stickZone"><div class="stick-base"><div id="stickKnob" class="stick-knob"></div></div></div>
   <div id="padArea">
     <div id="modeSwitch" class="ghost">モード: 幽体</div>
@@ -112,145 +116,856 @@
 <script type="module">
 import * as THREE from 'three';
 import * as CANNON from 'cannon-es';
-import { VRButton } from 'three/addons/webxr/VRButton.js';
 import { XRControllerModelFactory } from 'three/addons/webxr/XRControllerModelFactory.js';
+// VRButton removed to fix navigator.xr error
 
+// --- CONFIG (Original Colors) ---
 const CFG = {
   colors: {
     sky: 0x87CEEB, ground: 0xC2B280, 
     kekkai: 0x00bfff, ghost: 0x00ffaa, marker: 0xff0000,
     wall: 0xa0a0a0, building: 0xf0f0f0, pool: 0x88cccc,
-    enemy: 0xff4444, giant: 0x880000, item: 0x00ff00, vip: 0x0000ff
+    enemy: 0xff4444, giant: 0x880000, item: 0x00ff00, vip: 0x0000ff,
+    treeTrunk: 0x8B4513, treeLeaf: 0x228B22
   },
   player: { speed: 12.0, jump: 22.0, height: 1.7, maxHp: 100 },
   kekkai: { max: 5 }, dist: { near: 8.0, far: 20.0 }, field: { width: 120, depth: 160 }
 };
 
-let scene, camera, renderer, world;
-let playerBody, playerGroup;
-let enemies = [], kekkaiList = [], items = [], vip = null;
-let gameState = { wave: 1, kills: 0, req: 3, nextSpawn: 0, playerHp: 100, isVipMode: false };
-let currentDist = CFG.dist.near, aimMarker, isPhysMode = false;
-let controllers = { left: null, right: null };
+// --- VR SETTINGS ---
+const GlobalSettings = {
+  sensitivity: 2.5,
+  keyConfig: 'A'
+};
 
+// --- DOM REFERENCES ---
 const els = {
+  mobileUI: document.getElementById('mobileUI'),
   stick: document.getElementById('stickZone'), knob: document.getElementById('stickKnob'),
   msg: document.getElementById('flashMsg'),
   btnDist: document.getElementById('btnUp'), btnJump: document.getElementById('btnDown'),
   btnAct: document.getElementById('btnLeft'), btnDraw: document.getElementById('btnRight'),
-  modeBtn: document.getElementById('modeSwitch'),
-  distLabel: document.getElementById('distLabel'),
+  modeBtn: document.getElementById('modeSwitch'), distLabel: document.getElementById('distLabel'),
   wVal: document.getElementById('waveVal'), kVal: document.getElementById('killVal'), tVal: document.getElementById('targetVal'),
   hpText: document.getElementById('hpText'), hpBar: document.getElementById('hpBar'),
   dmgOverlay: document.getElementById('damage-overlay'),
   vipBox: document.getElementById('vipBox'), vipHpBar: document.getElementById('vipHpBar'),
-  kekVal: document.getElementById('kekVal')
+  kekVal: document.getElementById('kekVal'),
+  reticle: document.getElementById('centerReticle')
 };
 
-// State Variables (Global)
-let drawId = null, activeKekkai = null; // activeKekkai holds current expanding kekkai (phys or ghost)
-let input = { x: 0, y: 0 }, camAngle = { yaw: 0, pitch: 0 };
-let stickId = null, stickStart = { x: 0, y: 0 }, tapTime = 0, tapPos = { x: 0, y: 0 };
-let actId = null, actStartPos = { x: 0, y: 0 }, lookId = null, lastLook = { x: 0, y: 0 };
-let lastT = 0, vrState = { lastActR: false, lastActL: false, lastDist: false, rightStickX: 0 };
+// --- ENGINE GLOBALS ---
+let scene, camera, renderer, world;
+let dolly; // VR Rig
+let playerBody;
+let controllers = { left: null, right: null };
+let controllerGrips = { left: null, right: null };
+let raycaster; 
+let menuSystem;
 
-function init() {
-  try {
-    scene = new THREE.Scene(); scene.background = new THREE.Color(CFG.colors.sky); 
-    scene.fog = new THREE.FogExp2(CFG.colors.sky, 0.005);
-    camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
-    playerGroup = new THREE.Group(); playerGroup.add(camera); 
-    camera.position.set(0, CFG.player.height, 0); scene.add(playerGroup);
+// --- SHARED DATA ---
+let enemies = [], kekkaiList = [], items = [];
+
+// ==========================================
+// 1. INPUT ARCHITECTURE
+// ==========================================
+class InputManager {
+  constructor() {
+    this.strategy = new MobileInputStrategy();
+    this.state = {
+      move: { x: 0, y: 0 },
+      look: { x: 0, y: 0 }, 
+      actions: { jump: false, dist: false, metsu: false, draw: false, menu: false },
+      drawDelta: { x: 0, y: 0 },
+      modeToggle: false,
+      isVR: false
+    };
+  }
+
+  setStrategy(strategy) {
+    if(this.strategy) this.strategy.dispose();
+    this.strategy = strategy;
+    this.state.isVR = (strategy instanceof VRInputStrategy);
     
-    renderer = new THREE.WebGLRenderer({ antialias: true }); 
-    renderer.setSize(window.innerWidth, window.innerHeight); 
-    renderer.shadowMap.enabled = true; 
-    renderer.shadowMap.type = THREE.PCFSoftShadowMap; 
-    renderer.xr.enabled = true; 
-    renderer.xr.setReferenceSpaceType('local-floor');
-    document.body.appendChild(renderer.domElement);
-
-    const vrButton = VRButton.createButton(renderer);
-    document.body.appendChild(vrButton);
-    document.getElementById('vrBtn').style.display='none'; 
-
-    renderer.xr.addEventListener('sessionstart', () => {
-      document.getElementById('uiLayer').style.display = 'none';
-      document.getElementById('centerReticle').style.display = 'none';
-      playerBody.position.set(0, 5, 30); // Reset pos
-    });
-    renderer.xr.addEventListener('sessionend', () => {
-      document.getElementById('uiLayer').style.display = 'block';
-      document.getElementById('centerReticle').style.display = 'block';
-    });
-
-    // Controllers
-    const modelFactory = new XRControllerModelFactory();
-    for(let i=0; i<2; i++){
-       const c = renderer.xr.getController(i);
-       c.addEventListener('connected', (e)=>{ c.userData.handedness = e.data.handedness; controllers[e.data.handedness] = c; });
-       playerGroup.add(c);
-       const g = renderer.xr.getControllerGrip(i);
-       g.add(modelFactory.createControllerModel(g));
-       playerGroup.add(g);
+    // UI Switching
+    if(this.state.isVR) {
+      els.mobileUI.style.opacity = '0';
+      els.reticle.style.display = 'none';
+      setTimeout(()=>els.mobileUI.style.display='none', 500);
+    } else {
+      els.mobileUI.style.display = 'block';
+      els.reticle.style.display = 'block';
+      setTimeout(()=>els.mobileUI.style.opacity='1', 10);
     }
+  }
 
-    world = new CANNON.World(); world.gravity.set(0, -30, 0);
-    const mDef=new CANNON.Material('def'), mPly=new CANNON.Material('ply'), mEne=new CANNON.Material('ene'), mKek=new CANNON.Material('kek');
+  update(dt) {
+    if(this.strategy) this.strategy.updateState(this.state, dt);
+    return this.state;
+  }
+}
+
+class MobileInputStrategy {
+  constructor() {
+    this.stickId = null;
+    this.stickStart = {x:0, y:0};
+    this.lookId = null;
+    this.lastLook = {x:0, y:0};
+    this.tapTime = 0;
+    this.tapPos = {x:0, y:0};
+    this.activeDrawId = null;
+    this.drawStart = {x:0, y:0};
+    this.setupListeners();
+  }
+
+  setupListeners() {
+    // Stick
+    const onStickStart = e => {
+      e.preventDefault(); if(this.stickId!==null)return;
+      const t=e.changedTouches[0]; this.stickId=t.identifier;
+      const r=els.stick.getBoundingClientRect();
+      this.stickStart={x:r.left+r.width/2, y:r.top+r.height/2};
+      this.tapTime=Date.now(); this.tapPos={x:t.clientX, y:t.clientY};
+      this.moveStick(t.clientX, t.clientY);
+    };
+    const onStickMove = e => {
+      e.preventDefault();
+      for(let i=0; i<e.changedTouches.length; i++){
+        if(e.changedTouches[i].identifier===this.stickId) this.moveStick(e.changedTouches[i].clientX, e.changedTouches[i].clientY);
+      }
+    };
+    const onStickEnd = e => {
+      for(let i=0; i<e.changedTouches.length; i++){
+        if(e.changedTouches[i].identifier===this.stickId){
+          if(Date.now()-this.tapTime<200 && Math.hypot(e.changedTouches[i].clientX-this.tapPos.x, e.changedTouches[i].clientY-this.tapPos.y)<15){
+             playerSystem.inputState.actions.jump = true; // TAP TO JUMP
+          }
+          this.stickId=null; 
+          playerSystem.inputState.move = {x:0, y:0};
+          els.knob.style.transform='translate(-50%,-50%)';
+        }
+      }
+    };
+    els.stick.addEventListener('touchstart', onStickStart, {passive:false});
+    els.stick.addEventListener('touchmove', onStickMove, {passive:false});
+    els.stick.addEventListener('touchend', onStickEnd);
     
-    world.addContactMaterial(new CANNON.ContactMaterial(mPly, mDef, { friction: 0.0, restitution: 0.0 }));
-    world.addContactMaterial(new CANNON.ContactMaterial(mEne, mDef, { friction: 0.5, restitution: 0.3 }));
-    world.addContactMaterial(new CANNON.ContactMaterial(mKek, mEne, { friction: 0.1, restitution: 0.8 }));
-    world.addContactMaterial(new CANNON.ContactMaterial(mKek, mPly, { friction: 0.8, restitution: 0.0 }));
-    world.addContactMaterial(new CANNON.ContactMaterial(mPly, mEne, { friction: 0.5, restitution: 0.5 }));
+    // Look
+    const onLookStart = e => {
+      for(let i=0; i<e.changedTouches.length; i++){
+        if(this.lookId===null && e.changedTouches[i].target===renderer.domElement){
+          this.lookId=e.changedTouches[i].identifier; this.lastLook={x:e.changedTouches[i].clientX, y:e.changedTouches[i].clientY};
+        }
+      }
+    };
+    const onLookMove = e => {
+      if(this.lookId===null)return;
+      for(let i=0; i<e.changedTouches.length; i++){
+        if(e.changedTouches[i].identifier===this.lookId){
+          const t=e.changedTouches[i];
+          playerSystem.rotateCamera((t.clientX-this.lastLook.x)*0.004, (t.clientY-this.lastLook.y)*0.004);
+          this.lastLook={x:t.clientX, y:t.clientY};
+        }
+      }
+    };
+    const onLookEnd = e => { for(let i=0; i<e.changedTouches.length; i++) if(e.changedTouches[i].identifier===this.lookId) this.lookId=null; };
+    renderer.domElement.addEventListener('touchstart', onLookStart, {passive:false});
+    renderer.domElement.addEventListener('touchmove', onLookMove, {passive:false});
+    renderer.domElement.addEventListener('touchend', onLookEnd);
 
+    // Buttons
+    els.btnJump.addEventListener('touchstart', (e)=>{ e.preventDefault(); playerSystem.inputState.actions.jump = true; });
+    els.btnDist.addEventListener('touchstart', (e)=>{ e.preventDefault(); playerSystem.inputState.actions.dist = true; });
+    els.modeBtn.addEventListener('touchstart', (e)=>{ e.preventDefault(); playerSystem.inputState.modeToggle = true; });
+    
+    // Action (Metsu)
+    let actId = null, actStart = {x:0, y:0};
+    els.btnAct.addEventListener('touchstart', (e)=>{
+        e.preventDefault(); if(actId!==null)return;
+        const t=e.changedTouches[0]; actId=t.identifier; actStart={x:t.clientX, y:t.clientY};
+    });
+    els.btnAct.addEventListener('touchend', (e)=>{
+        e.preventDefault();
+        for(let i=0; i<e.changedTouches.length; i++){
+            if(e.changedTouches[i].identifier===actId){
+                if(Math.hypot(e.changedTouches[i].clientX - actStart.x, e.changedTouches[i].clientY - actStart.y) < 20) {
+                     playerSystem.inputState.actions.metsu = true;
+                } else {
+                     playerSystem.actionKai(); // Slide to Kai
+                }
+                actId=null;
+            }
+        }
+    });
+
+    // Draw
+    const onDrawStart = e => {
+      e.preventDefault(); if(this.activeDrawId!==null)return;
+      const t=e.changedTouches[0]; this.activeDrawId=t.identifier;
+      this.drawStart = {x:t.clientX, y:t.clientY};
+      playerSystem.inputState.actions.draw = true;
+      els.btnDraw.classList.add('drawing');
+    };
+    const onDrawMove = e => {
+      e.preventDefault();
+      for(let i=0; i<e.changedTouches.length; i++){
+        if(e.changedTouches[i].identifier===this.activeDrawId){
+          const t=e.changedTouches[i];
+          playerSystem.inputState.drawDelta = {
+            x: Math.abs(t.clientX - this.drawStart.x)*0.06,
+            y: (this.drawStart.y - t.clientY)*0.06
+          };
+        }
+      }
+    };
+    const onDrawEnd = e => {
+      for(let i=0; i<e.changedTouches.length; i++){
+        if(e.changedTouches[i].identifier===this.activeDrawId){
+          this.activeDrawId=null; playerSystem.inputState.actions.draw = false;
+          els.btnDraw.classList.remove('drawing');
+        }
+      }
+    };
+    els.btnDraw.addEventListener('touchstart', onDrawStart);
+    els.btnDraw.addEventListener('touchmove', onDrawMove);
+    els.btnDraw.addEventListener('touchend', onDrawEnd);
+  }
+
+  moveStick(cx, cy) {
+    let dx=cx-this.stickStart.x, dy=cy-this.stickStart.y;
+    const d=Math.hypot(dx,dy), max=(els.stick.offsetWidth/2)*0.8;
+    if(d>max){dx*=max/d; dy*=max/d;}
+    playerSystem.inputState.move = { x: dx/max, y: dy/max };
+    els.knob.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;
+  }
+  
+  updateState(state, dt) {}
+  dispose() {}
+}
+
+class VRInputStrategy {
+  constructor() {
+    this.lastState = { jump: false, dist: false, metsu: false, menu: false, leftGrip: false, rightGrip: false };
+    this.gripStartPos = { left: new THREE.Vector3(), right: new THREE.Vector3() };
+  }
+
+  updateState(state, dt) {
+    const s = renderer.xr.getSession();
+    if(!s) return;
+    
+    state.actions.jump = false; state.actions.dist = false; state.actions.metsu = false; state.actions.menu = false; state.modeToggle = false;
+    
+    if(menuSystem.isOpen) { state.move = {x:0, y:0}; }
+
+    for(const src of s.inputSources){
+      if(!src.gamepad) continue;
+      const gp = src.gamepad;
+      const hand = src.handedness;
+      
+      const isTrigger = gp.buttons[0]?.pressed;
+      const isGrip = gp.buttons[1]?.pressed;
+      const isBtn1 = gp.buttons[4]?.pressed; // A or X
+      const isBtn2 = gp.buttons[5]?.pressed; // B or Y
+
+      if(hand === 'left'){
+         if(!menuSystem.isOpen) {
+             state.move.x = gp.axes[2]; state.move.y = gp.axes[3];
+         }
+         // Menu toggle (X or Y button on left)
+         if(isBtn1 && !this.lastState.menu) state.actions.menu = true;
+         this.lastState.menu = isBtn1;
+
+         if(isGrip && !this.lastState.leftGrip) {
+             if(!playerSystem.isPhysMode) state.modeToggle = true; 
+             state.actions.draw = true;
+             this.gripStartPos.left.copy(controllers.left.position);
+         } else if(!isGrip && this.lastState.leftGrip) {
+             state.actions.draw = false;
+         }
+         
+         if(isGrip && state.actions.draw) {
+             const dist = controllers.left.position.distanceTo(this.gripStartPos.left);
+             const val = dist * GlobalSettings.sensitivity;
+             state.drawDelta = { x: val, y: val };
+         }
+         this.lastState.leftGrip = isGrip;
+         
+         if(isTrigger && !this.lastState.leftTrigger) state.actions.metsu = true; 
+         this.lastState.leftTrigger = isTrigger;
+      }
+      
+      if(hand === 'right'){
+         if(!menuSystem.isOpen) state.look.x = gp.axes[2];
+         if(isBtn1 && !this.lastState.jump && !menuSystem.isOpen) state.actions.jump = true;
+         this.lastState.jump = isBtn1;
+         if(isBtn2 && !this.lastState.dist && !menuSystem.isOpen) state.actions.dist = true;
+         this.lastState.dist = isBtn2;
+
+         if(isGrip && !this.lastState.rightGrip && !menuSystem.isOpen) {
+             if(playerSystem.isPhysMode) state.modeToggle = true; 
+             state.actions.draw = true;
+             this.gripStartPos.right.copy(controllers.right.position);
+         } else if(!isGrip && this.lastState.rightGrip) {
+             state.actions.draw = false;
+         }
+         
+         if(isGrip && state.actions.draw) {
+             const dist = controllers.right.position.distanceTo(this.gripStartPos.right);
+             const val = dist * GlobalSettings.sensitivity;
+             state.drawDelta = { x: val, y: val };
+         }
+         this.lastState.rightGrip = isGrip;
+
+         if(isTrigger && !this.lastState.rightTrigger && !menuSystem.isOpen) state.actions.metsu = true; 
+         this.lastState.rightTrigger = isTrigger;
+      }
+    }
+  }
+  dispose() {}
+}
+
+// ==========================================
+// 2. VR MENU SYSTEM
+// ==========================================
+class VRMenuSystem {
+  constructor() {
+    this.isOpen = false;
+    this.mesh = null;
+    this.canvas = document.createElement('canvas');
+    this.canvas.width = 512; this.canvas.height = 512;
+    this.ctx = this.canvas.getContext('2d');
+    this.texture = new THREE.CanvasTexture(this.canvas);
+    this.sensitivity = GlobalSettings.sensitivity;
+    this.keyConfig = GlobalSettings.keyConfig;
+    this.initMesh();
+    this.draw();
+  }
+
+  initMesh() {
+    const geo = new THREE.PlaneGeometry(1, 1);
+    const mat = new THREE.MeshBasicMaterial({ map: this.texture, transparent: true, side: THREE.DoubleSide, depthTest: false });
+    this.mesh = new THREE.Mesh(geo, mat);
+    this.mesh.renderOrder = 9999;
+    this.mesh.visible = false;
+    scene.add(this.mesh);
+  }
+
+  toggle() {
+    this.isOpen = !this.isOpen;
+    this.mesh.visible = this.isOpen;
+    if(this.isOpen) {
+        const pos = dolly.position.clone();
+        const dir = new THREE.Vector3();
+        camera.getWorldDirection(dir); dir.y = 0; dir.normalize();
+        this.mesh.position.copy(pos).add(new THREE.Vector3(0, 1.6, 0)).add(dir.multiplyScalar(1.5));
+        this.mesh.lookAt(pos.x, 1.6, pos.z);
+        this.mesh.rotation.y += Math.PI; 
+        controllers.right.add(raycaster.line);
+    } else {
+        controllers.right.remove(raycaster.line);
+    }
+  }
+
+  draw() {
+    const ctx = this.ctx; const w = this.canvas.width; const h = this.canvas.height;
+    ctx.fillStyle = 'rgba(0, 20, 40, 0.9)'; ctx.fillRect(0, 0, w, h);
+    ctx.strokeStyle = '#00ffff'; ctx.lineWidth = 10; ctx.strokeRect(5,5,w-10,h-10);
+    ctx.font = 'bold 50px sans-serif'; ctx.fillStyle = '#ffeb3b'; ctx.textAlign = 'center'; ctx.fillText("VR SETTINGS", w/2, 70);
+    
+    ctx.font = '30px sans-serif'; ctx.fillStyle = '#fff'; ctx.textAlign = 'left';
+    ctx.fillText(`結界感度 (Sensitivity): ${this.sensitivity.toFixed(1)}`, 50, 150);
+    ctx.fillStyle = '#555'; ctx.fillRect(50, 180, 400, 10);
+    
+    const minS = 1.0, maxS = 10.0;
+    const ratio = (this.sensitivity - minS) / (maxS - minS);
+    const knobX = 50 + 400 * ratio;
+    ctx.fillStyle = '#00ffff'; ctx.beginPath(); ctx.arc(knobX, 185, 20, 0, Math.PI*2); ctx.fill();
+
+    ctx.fillStyle = '#fff'; ctx.fillText(`ボタン配置: Pattern ${this.keyConfig}`, 50, 300);
+    ctx.fillStyle = this.keyConfig === 'A' ? '#00aa00' : '#555'; ctx.fillRect(50, 330, 150, 60);
+    ctx.fillStyle = '#fff'; ctx.textAlign = 'center'; ctx.fillText("Pattern A", 125, 370);
+    ctx.fillStyle = this.keyConfig === 'B' ? '#00aa00' : '#555'; ctx.fillRect(250, 330, 150, 60);
+    ctx.fillStyle = '#fff'; ctx.fillText("Pattern B", 325, 370);
+    
+    ctx.fillStyle = '#ff4444'; ctx.fillRect(156, 430, 200, 60);
+    ctx.fillStyle = '#fff'; ctx.fillText("CLOSE", 256, 470);
+    this.texture.needsUpdate = true;
+  }
+
+  updateInteraction() {
+    if(!this.isOpen) return;
+    const tempMatrix = new THREE.Matrix4();
+    tempMatrix.identity().extractRotation(controllers.right.matrixWorld);
+    raycaster.ray.origin.setFromMatrixPosition(controllers.right.matrixWorld);
+    raycaster.ray.direction.set(0, 0, -1).applyMatrix4(tempMatrix);
+    
+    const intersects = raycaster.intersectObject(this.mesh);
+    if(intersects.length > 0) {
+        const uv = intersects[0].uv;
+        const x = uv.x * 512; const y = (1 - uv.y) * 512;
+        const isTrigger = controllers.right.userData.isTriggerPressed;
+        
+        if(isTrigger) {
+            if(y > 150 && y < 220 && x > 30 && x < 480) {
+                const r = Math.max(0, Math.min(1, (x - 50) / 400));
+                this.sensitivity = 1.0 + r * 9.0;
+                GlobalSettings.sensitivity = this.sensitivity;
+                this.draw();
+            }
+            if(y > 330 && y < 390 && x > 50 && x < 200) { this.keyConfig = 'A'; GlobalSettings.keyConfig = 'A'; this.draw(); }
+            if(y > 330 && y < 390 && x > 250 && x < 400) { this.keyConfig = 'B'; GlobalSettings.keyConfig = 'B'; this.draw(); }
+            if(y > 430 && y < 490 && x > 156 && x < 356) { this.toggle(); }
+        }
+    }
+  }
+}
+
+// ==========================================
+// 3. PLAYER SYSTEM
+// ==========================================
+class PlayerSystem {
+  constructor() {
+    this.hp = CFG.player.maxHp; this.dist = CFG.dist.near; this.isPhysMode = false;
+    this.aimMarker = null; this.camAngle = { yaw: 0, pitch: 0 };
+    this.inputManager = new InputManager();
+    this.inputState = this.inputManager.state;
+    this.activeKekkai = null;
+    this.initPhysics(); this.initVisuals();
+  }
+
+  initPhysics() {
+    const mPly = new CANNON.Material('ply');
     playerBody = new CANNON.Body({ mass: 70, shape: new CANNON.Sphere(0.6), material: mPly, fixedRotation: true, linearDamping: 0.9 });
     playerBody.position.set(0, 5, 30); world.addBody(playerBody);
+
     playerBody.addEventListener('collide', (e) => {
       if (e.body && e.body.material && e.body.material.name === 'ene') {
         const relVel = e.contact.getImpactVelocityAlongNormal();
         if (Math.abs(relVel) > 2.0) {
-          takeDamage(Math.floor(Math.abs(relVel) * 2));
+          this.takeDamage(Math.floor(Math.abs(relVel) * 2));
           const normal = new CANNON.Vec3(); e.contact.ni.negate(normal);
           playerBody.applyImpulse(normal.scale(50 * Math.abs(relVel)), playerBody.position);
         }
       }
     });
+  }
 
-    setupEnvironment(mDef);
-    
+  initVisuals() {
+    dolly = new THREE.Group(); dolly.add(camera); scene.add(dolly);
     const aimGeo = new THREE.SphereGeometry(0.3, 16, 16);
     const aimMat = new THREE.MeshBasicMaterial({ color: CFG.colors.marker, transparent: true, opacity: 0.7, depthTest: false });
-    aimMarker = new THREE.Mesh(aimGeo, aimMat); aimMarker.renderOrder = 999; scene.add(aimMarker);
+    this.aimMarker = new THREE.Mesh(aimGeo, aimMat); this.aimMarker.renderOrder = 999; scene.add(this.aimMarker);
+  }
 
-    setupInputs(); 
-    for (let i = 0; i < 3; i++) spawnEnemy(); 
-    renderer.setAnimationLoop(loop);
+  rotateCamera(dx, dy) {
+    this.camAngle.yaw -= dx;
+    this.camAngle.pitch -= dy;
+    this.camAngle.pitch = Math.max(-1.5, Math.min(1.5, this.camAngle.pitch));
+  }
+  
+  snapTurn(val) {
+      if(Math.abs(val) > 0.5) {
+          if(!this.snapTurnWait) { dolly.rotation.y -= Math.sign(val) * Math.PI / 4; this.snapTurnWait = true; }
+      } else { this.snapTurnWait = false; }
+  }
 
-  } catch (e) { console.error(e); alert("初期化エラー: " + e.message); }
+  update(dt) {
+    const inp = this.inputManager.update(dt);
+    if(inp.actions.menu) { menuSystem.toggle(); inp.actions.menu = false; }
+    
+    let moveVec = new THREE.Vector3(inp.move.x, 0, inp.move.y);
+    if(inp.isVR) {
+        const hmdDir = new THREE.Vector3(); camera.getWorldDirection(hmdDir); hmdDir.y = 0; hmdDir.normalize();
+        const hmdRight = new THREE.Vector3().crossVectors(hmdDir, new THREE.Vector3(0,1,0));
+        moveVec = hmdRight.multiplyScalar(inp.move.x).add(hmdDir.multiplyScalar(-inp.move.y));
+        this.snapTurn(inp.look.x);
+        dolly.position.copy(playerBody.position);
+    } else {
+        moveVec.applyAxisAngle(new THREE.Vector3(0,1,0), this.camAngle.yaw);
+        camera.rotation.x = this.camAngle.pitch;
+        dolly.rotation.y = this.camAngle.yaw; 
+        dolly.position.copy(playerBody.position).add(new THREE.Vector3(0, CFG.player.height, 0));
+    }
+    
+    playerBody.velocity.x = moveVec.x * CFG.player.speed;
+    playerBody.velocity.z = moveVec.z * CFG.player.speed;
+
+    if(inp.actions.jump && Math.abs(playerBody.velocity.y)<1) playerBody.velocity.y = CFG.player.jump;
+    if(inp.actions.dist) {
+        this.dist = (this.dist===CFG.dist.near) ? CFG.dist.far : CFG.dist.near;
+        els.distLabel.textContent = (this.dist===CFG.dist.near)?"近":"遠"; inp.actions.dist = false;
+    }
+    if(inp.modeToggle) this.toggleMode();
+    
+    if(inp.actions.draw) {
+        if(!this.activeKekkai) { if(kekkaiList.length >= CFG.kekkai.max) { showMsg("上限到達","#f44"); } else { this.startDrawing(); } }
+        else { this.updateActiveKekkai(this.activeKekkai, inp.drawDelta.x, inp.drawDelta.y); }
+    } else { if(this.activeKekkai) this.finishDrawing(); }
+    
+    if(inp.actions.metsu) { if(!inp.actions.draw) { this.actionMetsu(); inp.actions.metsu = false; } }
+
+    if(this.aimMarker){
+        let origin, direction = new THREE.Vector3();
+        if(inp.isVR) {
+            if(controllers.right) { origin = controllers.right.position.clone(); const rot = new THREE.Matrix4().extractRotation(controllers.right.matrixWorld); direction.set(0,0,-1).applyMatrix4(rot); } 
+            else { camera.getWorldDirection(direction); origin = camera.getWorldPosition(new THREE.Vector3()); }
+        } else {
+            const e = new THREE.Euler(this.camAngle.pitch, this.camAngle.yaw, 0, 'YXZ');
+            direction.set(0, 0, -1).applyEuler(e); origin = dolly.position.clone();
+        }
+        const p = origin.add(direction.multiplyScalar(this.dist)); p.y = Math.max(0.5, p.y); this.aimMarker.position.copy(p);
+    }
+  }
+
+  toggleMode() {
+    this.isPhysMode = !this.isPhysMode;
+    els.modeBtn.textContent = this.isPhysMode ? "モード: 顕現" : "モード: 幽体";
+    els.modeBtn.className = this.isPhysMode ? "phys" : "ghost";
+    els.btnDraw.style.background = this.isPhysMode ? "linear-gradient(135deg, #FFD700, #FF8C00)" : "linear-gradient(135deg, #03a9f4, #0288d1)";
+    els.btnDraw.innerHTML = this.isPhysMode ? "顕<br><span style='font-size:10px'>Hold</span>" : "結<br><span style='font-size:10px'>Hold</span>";
+    showMsg(this.isPhysMode ? "物理顕現モード" : "幽体結界モード", "#fff");
+  }
+
+  takeDamage(val) {
+    this.hp = Math.max(0, this.hp - val);
+    els.hpText.textContent = this.hp; els.hpBar.style.width = (this.hp / CFG.player.maxHp * 100) + "%";
+    els.hpBar.style.backgroundColor = this.hp < 30 ? "#f00" : "#0f0";
+    els.dmgOverlay.style.opacity = 0.5; setTimeout(() => els.dmgOverlay.style.opacity = 0, 150);
+    if (this.hp <= 0) showMsg("GAME OVER", "#f00");
+  }
+
+  heal(val) { this.hp = Math.min(CFG.player.maxHp, this.hp + val); els.hpText.textContent = this.hp; els.hpBar.style.width = (this.hp / CFG.player.maxHp * 100) + "%"; showMsg("RECOVER!", "#0f0"); }
+
+  startDrawing() { this.activeKekkai = this.createActiveKekkai(this.isPhysMode); }
+  finishDrawing() { if(this.activeKekkai) { this.finalizeKekkai(this.activeKekkai); this.activeKekkai=null; } }
+
+  createActiveKekkai(isPhysical) {
+    const p = this.aimMarker.position.clone();
+    let r = this.camAngle.yaw;
+    if(renderer.xr.isPresenting) { const e = new THREE.Euler().setFromQuaternion(camera.quaternion, 'YXZ'); r = e.y; }
+
+    const g = new THREE.BoxGeometry(1, 1, 1);
+    const col = isPhysical ? 0xffff00 : CFG.colors.ghost;
+    const m = new THREE.MeshPhongMaterial({ color: col, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
+    const mesh = new THREE.Mesh(g, m); 
+    mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({ color: 0xffffff }))); 
+    mesh.position.copy(p); mesh.rotation.y = r; scene.add(mesh);
+    
+    let b = null;
+    if(isPhysical) { b = new CANNON.Body({ mass: 0, material: new CANNON.Material('kek') }); b.position.copy(p); b.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), r); world.addBody(b); }
+    return { body: b, mesh: mesh, startP: p, startR: r, currentS: { x: 1, y: 1, z: 1 }, isPhysical: isPhysical };
+  }
+
+  updateActiveKekkai(k, dx, dy) {
+    const sensitivity = 1.0; 
+    const sx = 1.0 + Math.max(0, dx * sensitivity); 
+    const sy = 1.0 + Math.max(0, dy * sensitivity); 
+    const sz = sx; 
+    k.currentS = { x: sx, y: sy, z: sz }; k.mesh.scale.set(sx, sy, sz);
+    const newY = k.startP.y + (sy - 1.0) / 2; k.mesh.position.y = newY; 
+    if(k.body) { k.body.position.y = newY; k.body.shapes = []; k.body.addShape(new CANNON.Box(new CANNON.Vec3(sx / 2, sy / 2, sz / 2))); }
+  }
+
+  createHollowBoxShapes(body, sx, sy, sz, thickness = 0.5) {
+      const hx = sx/2, hy = sy/2, hz = sz/2; const th = thickness/2;
+      body.addShape(new CANNON.Box(new CANNON.Vec3(hx, th, hz)), new CANNON.Vec3(0, hy, 0));
+      body.addShape(new CANNON.Box(new CANNON.Vec3(hx, th, hz)), new CANNON.Vec3(0, -hy, 0));
+      body.addShape(new CANNON.Box(new CANNON.Vec3(th, hy, hz)), new CANNON.Vec3(hx, 0, 0));
+      body.addShape(new CANNON.Box(new CANNON.Vec3(th, hy, hz)), new CANNON.Vec3(-hx, 0, 0));
+      body.addShape(new CANNON.Box(new CANNON.Vec3(hx, hy, th)), new CANNON.Vec3(0, 0, hz));
+      body.addShape(new CANNON.Box(new CANNON.Vec3(hx, hy, th)), new CANNON.Vec3(0, 0, -hz));
+  }
+
+  finalizeKekkai(k) {
+    const kekkaiBox = new THREE.Box3().setFromObject(k.mesh);
+    const trappedEnemies = [];
+    if (!k.isPhysical) { enemies.forEach(e => { if (kekkaiBox.containsPoint(e.mesh.position)) trappedEnemies.push(e); }); }
+
+    let b = null;
+    if (!k.isPhysical && trappedEnemies.length > 0) { b = new CANNON.Body({ mass: 0, material: new CANNON.Material('kek') }); this.createHollowBoxShapes(b, k.currentS.x, k.currentS.y, k.currentS.z); } 
+    else if (!k.isPhysical) { b = new CANNON.Body({ mass: 0, material: new CANNON.Material('kek') }); b.addShape(new CANNON.Box(new CANNON.Vec3(k.currentS.x/2, k.currentS.y/2, k.currentS.z/2))); } 
+    else { b = k.body; }
+    
+    if (b) { b.position.copy(k.mesh.position); b.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), k.startR); if (!k.body) world.addBody(b); k.body = b; k.trapped = trappedEnemies; }
+    
+    k.mesh.material.color.setHex(CFG.colors.kekkai); k.mesh.material.opacity = 0.3;
+    kekkaiList.push({ body: k.body, mesh: k.mesh, shrinking: false, isHollow: (trappedEnemies.length > 0) }); 
+    spawnText(k.isPhysical ? "顕" : "結", k.mesh.position, "#0ff"); updateHUD();
+  }
+
+  actionMetsu() {
+    let t = null, minD = 999; 
+    kekkaiList.forEach(k => { const d = playerBody.position.distanceTo(k.body.position); if (d < minD) { minD = d; t = k; } });
+    if (!t || t.shrinking) { showMsg("対象なし", "#888"); return; }
+    showMsg("滅！", "#f24"); spawnText("滅", t.mesh.position, "#f24"); t.shrinking = true; t.mesh.material.color.setHex(0xff0044);
+    
+    let sc = 1.0; const initialScale = t.mesh.scale.clone();
+    const shrinkLoop = () => {
+      if (!kekkaiList.includes(t)) return; 
+      sc -= 0.05; 
+      t.mesh.scale.set(initialScale.x * sc, initialScale.y * sc, initialScale.z * sc);
+      if(t.body) { t.body.shapes = []; if(t.isHollow) this.createHollowBoxShapes(t.body, initialScale.x * sc, initialScale.y * sc, initialScale.z * sc); else t.body.addShape(new CANNON.Box(new CANNON.Vec3((initialScale.x * sc)/2, (initialScale.y * sc)/2, (initialScale.z * sc)/2))); }
+      
+      const checkKill = (e) => { if (sc < 0.95 && gameSystem) { if(e.isGiant) e.hp = 0; gameSystem.killEnemy(e); } };
+
+      if (t.trapped && t.trapped.length > 0) {
+          t.trapped.forEach(e => { if (enemies.includes(e)) { const forceDir = t.body.position.vsub(e.body.position); forceDir.normalize(); e.body.applyForce(forceDir.scale(500), e.body.position); checkKill(e); } });
+      } else {
+          const bbox = new THREE.Box3().setFromObject(t.mesh); enemies.forEach(e => { if (bbox.containsPoint(e.mesh.position)) checkKill(e); });
+      }
+      
+      if (sc <= 0.1) { this.removeKekkai(t); spawnParticle(t.mesh.position, 30, 0xffaa00); } else { requestAnimationFrame(shrinkLoop); }
+    }; shrinkLoop();
+  }
+  
+  actionKai() { 
+    const t = kekkaiList[kekkaiList.length - 1]; 
+    if (t) { showMsg("解", "#4f8"); spawnText("解", t.mesh.position, "#4f8"); this.removeKekkai(t); } 
+    else { showMsg("結界なし", "#888"); }
+  }
+
+  removeKekkai(k) { scene.remove(k.mesh); world.removeBody(k.body); kekkaiList = kekkaiList.filter(o => o !== k); updateHUD(); }
 }
 
-// Logic Utils
-function takeDamage(val) {
-  gameState.playerHp = Math.max(0, gameState.playerHp - val);
-  els.hpText.textContent = gameState.playerHp;
-  els.hpBar.style.width = (gameState.playerHp / CFG.player.maxHp * 100) + "%";
-  els.hpBar.style.backgroundColor = gameState.playerHp < 30 ? "#f00" : "#0f0";
-  els.dmgOverlay.style.opacity = 0.5; setTimeout(() => els.dmgOverlay.style.opacity = 0, 150);
-  if (gameState.playerHp <= 0) showMsg("GAME OVER", "#f00");
+// ==========================================
+// 4. GAME SYSTEM (Restored Original)
+// ==========================================
+class GameSystem {
+  constructor() {
+    this.wave = 1; this.kills = 0; this.req = 3; this.nextSpawn = 0; this.vip = null; this.goalPos = new THREE.Vector3();
+    this.mDef = new CANNON.Material('def'); this.mEne = new CANNON.Material('ene'); this.mKek = new CANNON.Material('kek');
+    this.setupContactMaterials(); this.setupEnvironment();
+    for (let i = 0; i < 3; i++) this.spawnEnemy();
+  }
+
+  setupContactMaterials() {
+    const mPly = playerBody.material;
+    world.addContactMaterial(new CANNON.ContactMaterial(mPly, this.mDef, { friction: 0.0, restitution: 0.0 }));
+    world.addContactMaterial(new CANNON.ContactMaterial(this.mEne, this.mDef, { friction: 0.5, restitution: 0.3 }));
+    world.addContactMaterial(new CANNON.ContactMaterial(this.mKek, this.mEne, { friction: 0.1, restitution: 0.8 }));
+    world.addContactMaterial(new CANNON.ContactMaterial(this.mKek, mPly, { friction: 0.8, restitution: 0.0 }));
+    world.addContactMaterial(new CANNON.ContactMaterial(mPly, this.mEne, { friction: 0.5, restitution: 0.5 }));
+  }
+
+  setupEnvironment() {
+    const mat = this.mDef;
+    const sun=new THREE.DirectionalLight(0xffffee,1.2); sun.position.set(-50,100,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); scene.add(sun); scene.add(new THREE.AmbientLight(0x555566,0.6));
+    const gGeo=new THREE.PlaneGeometry(CFG.field.width+40,CFG.field.depth+40); const gMat=new THREE.MeshStandardMaterial({color:CFG.colors.ground,roughness:0.9});
+    const ground=new THREE.Mesh(gGeo,gMat); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
+    const gBody=new CANNON.Body({mass:0,material:mat}); gBody.addShape(new CANNON.Plane()); gBody.quaternion.setFromEuler(-Math.PI/2,0,0); world.addBody(gBody);
+
+    const createBox=(x,y,z,w,h,d,col,tr=false,op=1)=>{
+      const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:col,transparent:tr,opacity:op})); 
+      m.position.set(x,y,z); m.castShadow=!tr; m.receiveShadow=true; scene.add(m);
+      const b=new CANNON.Body({mass:0,material:mat}); b.addShape(new CANNON.Box(new CANNON.Vec3(w/2,h/2,d/2))); b.position.copy(m.position); world.addBody(b); 
+      return m;
+    };
+
+    const FW=CFG.field.width, FD=CFG.field.depth, WH=8;
+    // Walls
+    createBox(-FW/2-1,WH/2,0,2,WH,FD+2,CFG.colors.wall); createBox(FW/2+1,WH/2,0,2,WH,FD+2,CFG.colors.wall);
+    // Gate
+    const gateZ = FD/2 + 1; this.goalPos.set(0, 0, gateZ - 5);
+    const gateWidth = FW / 4; const wallWidth = (FW - gateWidth) / 2; 
+    createBox(-FW/2 + wallWidth/2, WH/2, gateZ, wallWidth, WH, 2, CFG.colors.wall); createBox(FW/2 - wallWidth/2, WH/2, gateZ, wallWidth, WH, 2, CFG.colors.wall);
+    for(let x = -gateWidth/2; x <= gateWidth/2; x += 4) createBox(x, WH/2, gateZ, 0.8, WH, 0.8, 0x555555);
+    for(let h = 2; h < WH; h += 2) createBox(0, h, gateZ, gateWidth, 0.2, 0.2, 0x333333);
+    createBox(0, 0.5, gateZ, gateWidth, 1, 1, 0x555555);
+    
+    // Goal
+    this.goalMarker = new THREE.Group();
+    const gm = new THREE.Mesh(new THREE.CylinderGeometry(3,3,10,16), new THREE.MeshBasicMaterial({color: 0x00ff00, transparent:true, opacity:0.2, side: THREE.DoubleSide, depthWrite:false}));
+    gm.position.set(0, 5, gateZ - 5); this.goalMarker.add(gm);
+    const cvs = document.createElement('canvas'); cvs.width=128; cvs.height=64;
+    const ctx = cvs.getContext('2d'); ctx.font="bold 40px sans-serif"; ctx.fillStyle="#0f0"; ctx.textAlign="center"; ctx.fillText("GOAL",64,48);
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(cvs)}));
+    sp.position.set(0, 12, gateZ - 5); sp.scale.set(10,5,1); this.goalMarker.add(sp);
+    this.goalMarker.visible = false; scene.add(this.goalMarker);
+
+    // Trees
+    const createTree = (x, z) => {
+      const h = 4 + Math.random() * 2;
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.5, h), new THREE.MeshStandardMaterial({color:CFG.colors.treeTrunk}));
+      trunk.position.set(x, h/2, z); scene.add(trunk);
+      const b = new CANNON.Body({mass:0, material:mat}); b.addShape(new CANNON.Cylinder(0.4, 0.5, h, 8)); b.position.copy(trunk.position); b.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0),-Math.PI/2); world.addBody(b);
+      const lg = new THREE.Group(); lg.position.set(x, h, z);
+      const lMat = new THREE.MeshStandardMaterial({color:CFG.colors.treeLeaf});
+      const addLeaf = (lx, ly, lz, s) => { const lm = new THREE.Mesh(new THREE.IcosahedronGeometry(s, 1), lMat); lm.position.set(lx, ly, lz); lg.add(lm); };
+      addLeaf(0, 1.5, 0, 1.5); addLeaf(1, 0.5, 0, 1.2); addLeaf(-1, 0.5, 0, 1.2); addLeaf(0, 0.5, 1, 1.2); addLeaf(0, 0.5, -1, 1.2);
+      scene.add(lg);
+    };
+    for(let i=0; i<6; i++) { createTree(-FW/2 + 3, (Math.random()-0.5)*FD*0.8); createTree(FW/2 - 3, (Math.random()-0.5)*FD*0.8); }
+
+    // Building
+    const bH=30, bZ=-FD/2-20, rimH = 2.0; 
+    createBox(0, (bH-rimH)/2, bZ, FW, bH-rimH, 40, CFG.colors.building);
+    createBox(0, bH - rimH/2, bZ, FW, rimH, 40, 0x708090); 
+    const winGeo = new THREE.PlaneGeometry(2, 3); const winMat = new THREE.MeshBasicMaterial({color: 0x87CEFA, side: THREE.DoubleSide});
+    for(let wx = -FW/2 + 5; wx < FW/2; wx += 8) { for(let wy = 6; wy < bH - 3; wy += 7) { const win = new THREE.Mesh(winGeo, winMat); win.position.set(wx, wy, bZ + 20 + 0.1); scene.add(win); } }
+    
+    // Water Tower
+    const wtH = 8, wtR = 5, wtY = bH, wtZ = bZ; 
+    const wtBody = new CANNON.Body({mass:0, material:mat}); wtBody.addShape(new CANNON.Cylinder(wtR, wtR, wtH, 16)); wtBody.position.set(0, wtY + wtH/2, wtZ); wtBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0),-Math.PI/2); world.addBody(wtBody);
+    const wtMesh = new THREE.Mesh(new THREE.CylinderGeometry(wtR, wtR, wtH, 32), new THREE.MeshStandardMaterial({color:0xcccccc})); wtMesh.position.copy(wtBody.position); wtMesh.quaternion.copy(wtBody.quaternion); scene.add(wtMesh);
+
+    // School Slopes
+    const stW=8, stRise=30, stZ=bZ+20+stW/2, slopeThickness=1.0, midY=stRise/2 - slopeThickness/2;
+    const createSchoolSlope = (startX, endX) => {
+      const run = Math.abs(endX - startX); const len = Math.sqrt(run*run + stRise*stRise); const ang = Math.atan2(stRise, run); const midX = (startX + endX)/2;
+      const b=new CANNON.Body({mass:0,material:mat}); 
+      b.addShape(new CANNON.Box(new CANNON.Vec3(len/2, slopeThickness/2, stW/2)));
+      const rH = 1.2;
+      b.addShape(new CANNON.Box(new CANNON.Vec3(len/2, 0.1, 0.1)), new CANNON.Vec3(0, rH, stW/2 - 0.2));
+      b.addShape(new CANNON.Box(new CANNON.Vec3(len/2, 0.1, 0.1)), new CANNON.Vec3(0, rH, -stW/2 + 0.2));
+      b.addShape(new CANNON.Box(new CANNON.Vec3(len/2, rH/2, 0.05)), new CANNON.Vec3(0, rH/2, stW/2 - 0.2));
+      b.addShape(new CANNON.Box(new CANNON.Vec3(len/2, rH/2, 0.05)), new CANNON.Vec3(0, rH/2, -stW/2 + 0.2));
+      b.position.set(midX, midY, stZ); const dir = (endX > startX) ? 1 : -1; b.quaternion.setFromEuler(0, 0, dir * ang); world.addBody(b);
+      const m=new THREE.Mesh(new THREE.BoxGeometry(len,slopeThickness,stW), new THREE.MeshStandardMaterial({color:0xdddddd})); m.position.copy(b.position); m.quaternion.copy(b.quaternion); scene.add(m);
+      const railGeo = new THREE.BoxGeometry(len, 0.2, 0.2); const railMat = new THREE.MeshStandardMaterial({color:0x555555});
+      const r1 = new THREE.Mesh(railGeo, railMat); r1.position.copy(b.position); r1.quaternion.copy(b.quaternion); r1.translateY(rH); r1.translateZ(stW/2 - 0.2); scene.add(r1);
+      const r2 = new THREE.Mesh(railGeo, railMat); r2.position.copy(b.position); r2.quaternion.copy(b.quaternion); r2.translateY(rH); r2.translateZ(-stW/2 + 0.2); scene.add(r2);
+      const landingLen = 6; const topX = endX + dir * (landingLen/2); const landY = stRise - slopeThickness/2; const landZ = stZ - 1.0; const landD = stW + 2.0;
+      createBox(topX, landY, landZ, landingLen, slopeThickness, landD, 0xcccccc);
+    };
+    createSchoolSlope(5, 55); createSchoolSlope(-5, -55);
+
+    // Pool
+    const pX=FW/2-25, pZ=0, pW=30, pD=60, poolBaseH = 5.0; 
+    createBox(pX, poolBaseH/2, pZ, pW, poolBaseH, pD, CFG.colors.pool);
+    const wallH = 1.5; const deckY = poolBaseH + wallH/2; const pfH = 1.5; const pfY = poolBaseH + pfH/2; const pfCol = 0xeeeeee;
+    createBox(pX, pfY, pZ - pD/2, pW, pfH, 0.2, pfCol); createBox(pX, pfY, pZ + pD/2, pW, pfH, 0.2, pfCol);
+    
+    const createPoolSlope = (sideX, sideZ, dirZ) => {
+        const rampLen = 15; const rampW = 4; const ang = Math.asin(poolBaseH / rampLen); const runLen = Math.cos(ang) * rampLen; 
+        const rBody = new CANNON.Body({mass:0, material:mat}); rBody.addShape(new CANNON.Box(new CANNON.Vec3(rampW/2, 0.5, rampLen/2))); rBody.position.set(sideX, poolBaseH/2, sideZ); rBody.quaternion.setFromEuler(-ang * dirZ, 0, 0); world.addBody(rBody);
+        const rMesh = new THREE.Mesh(new THREE.BoxGeometry(rampW, 1, rampLen), new THREE.MeshStandardMaterial({color:0xdddddd})); rMesh.position.copy(rBody.position); rMesh.quaternion.copy(rBody.quaternion); scene.add(rMesh);
+        const landLen = 4; const landZ = sideZ + (runLen/2 + landLen/2) * dirZ; const isLeft = sideX < pX;
+        createBox(sideX, poolBaseH - 0.5, landZ, rampW, 1, landLen, 0xcccccc);
+        createBox(sideX + (isLeft?1:-1)*(rampW/2 + (Math.abs(sideX - (pX + (isLeft?-pW/2:pW/2))) - rampW/2)/2), poolBaseH-0.5, landZ, Math.abs(sideX - (pX + (isLeft?-pW/2:pW/2))) - rampW/2 + 0.1, 1, landLen - 0.2, 0xcccccc);
+        return { zMin: Math.min(landZ - landLen/2, landZ + landLen/2), zMax: Math.max(landZ - landLen/2, landZ + landLen/2) };
+    };
+    const range1 = createPoolSlope(pX - pW/2 - 4, pZ - 10, 1); 
+    const range2 = createPoolSlope(pX + pW/2 + 4, pZ + 10, -1); 
+    const sideFence = (x, zStart, zEnd) => { const len = Math.abs(zEnd - zStart); if(len < 0.1) return; const zMid = (zStart + zEnd) / 2; createBox(x, pfY, zMid, 0.2, pfH, len, pfCol); };
+    sideFence(pX - pW/2, -pD/2, range1.zMin); sideFence(pX - pW/2, range1.zMax, pD/2);
+    sideFence(pX + pW/2, -pD/2, range2.zMin); sideFence(pX + pW/2, range2.zMax, pD/2);
+    createBox(pX - pW/2 + 0.5, deckY, pZ, 0.5, wallH, pD, CFG.colors.pool); createBox(pX + pW/2 - 0.5, deckY, pZ, 0.5, wallH, pD, CFG.colors.pool);
+    createBox(pX, deckY, pZ - pD/2 + 0.5, pW, wallH, 0.5, CFG.colors.pool); createBox(pX, deckY, pZ + pD/2 - 0.5, pW, wallH, 0.5, CFG.colors.pool);
+    const wt = new THREE.Mesh(new THREE.PlaneGeometry(pW-2, pD-2), new THREE.MeshBasicMaterial({color:0x00aaff, transparent:true, opacity:0.6, side:THREE.DoubleSide})); wt.rotation.x=-Math.PI/2; wt.position.set(pX, poolBaseH + 1.0, pZ); scene.add(wt);
+  }
+
+  spawnEnemy() {
+    if (enemies.length >= 6 + this.wave) return;
+    const r = Math.random(); let x, y, z; const fW = CFG.field.width, fD = CFG.field.depth;
+    if (r < 0.6) { x = (Math.random() - .5) * fW; z = (Math.random() - .5) * fD; y = 20; } 
+    else if (r < 0.8) { x = (Math.random() - .5) * (fW - 5); z = (-fD / 2 - 20) + (Math.random() - .5) * 30; y = 35; } 
+    else { x = (fW / 2 - 25) + (Math.random() - .5) * 20; z = (Math.random() - .5) * 50; y = 10; }
+    const sz = 0.6 + Math.random() * 0.8;
+    if (Math.random() < 0.2) this.spawnGiant(x, y, z);
+    else {
+      const cl = new THREE.Color().setHSL(Math.random(), 0.8, 0.5);
+      const b = new CANNON.Body({ mass: 15*sz, shape: new CANNON.Sphere(sz), material: this.mEne, linearDamping: 0.4 });
+      b.position.set(x, y, z); world.addBody(b); b.outsideTimer = 0;
+      const m = new THREE.Mesh(new THREE.IcosahedronGeometry(sz, 0), new THREE.MeshStandardMaterial({ color: cl, roughness: 0.3 }));
+      scene.add(m); enemies.push({ body: b, mesh: m, isGiant: false });
+    }
+    updateHUD();
+  }
+
+  spawnGiant(x, y, z) {
+    const sz = 1.5; 
+    const b = new CANNON.Body({ mass: 100, material: this.mEne, linearDamping: 0.5 });
+    b.addShape(new CANNON.Sphere(sz), new CANNON.Vec3(0, 0, 0)); b.addShape(new CANNON.Sphere(0.8), new CANNON.Vec3(0, 2, 0));
+    b.position.set(x, y, z); world.addBody(b); b.outsideTimer = 0;
+    const g = new THREE.Group();
+    g.add(new THREE.Mesh(new THREE.SphereGeometry(sz), new THREE.MeshStandardMaterial({ color: CFG.colors.giant })));
+    const hm = new THREE.Mesh(new THREE.SphereGeometry(0.8), new THREE.MeshStandardMaterial({ color: 0x550000 })); hm.position.y = 2; g.add(hm);
+    scene.add(g); enemies.push({ body: b, mesh: g, isGiant: true, hp: 5 });
+  }
+
+  killEnemy(e) {
+    if (!enemies.includes(e)) return;
+    if (e.isGiant && e.hp > 0) {
+      e.hp--; spawnParticle(e.mesh.position, 10, 0xffaa00);
+      const push = playerBody.position.vsub(e.body.position); push.normalize(); e.body.applyImpulse(push.scale(-500), e.body.position);
+      if (e.hp > 0) return;
+    }
+    enemies = enemies.filter(o => o !== e); scene.remove(e.mesh); world.removeBody(e.body); spawnParticle(e.mesh.position, 25, 0xff0000);
+    if (Math.random() < 0.3) this.spawnItem(e.body.position);
+    this.kills++; this.req--; 
+    if (this.req <= 0) { this.wave++; this.req = this.wave * 2 + 4; showMsg(`WAVE ${this.wave}`, "#fe0"); if (this.wave % 3 === 0) this.startVipMission(); }
+    updateHUD();
+  }
+
+  removeEnemy(e) { if (!enemies.includes(e)) return; enemies = enemies.filter(o => o !== e); scene.remove(e.mesh); world.removeBody(e.body); updateHUD(); }
+
+  spawnItem(pos) {
+    const b = new CANNON.Body({ mass: 1, shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)), material: new CANNON.Material('item') }); b.position.copy(pos); world.addBody(b);
+    const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: CFG.colors.item, wireframe: true })); m.position.copy(pos); scene.add(m); items.push({ body: b, mesh: m });
+  }
+
+  startVipMission() {
+    if (this.vip) return; 
+    showMsg("護衛任務開始!", "#0ff"); els.vipBox.style.display = "block"; this.goalMarker.visible = true;
+    const startX = (Math.random() - 0.5) * 40; const startZ = -30 + (Math.random() * 20); 
+    const b = new CANNON.Body({ mass: 50, shape: new CANNON.Cylinder(0.5, 0.5, 1.8, 8), material: new CANNON.Material('ply'), fixedRotation: true, linearDamping: 0.1 });
+    b.position.set(startX, 5, startZ); world.addBody(b);
+    const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.8, 16), new THREE.MeshStandardMaterial({ color: CFG.colors.vip })));
+    const nose = new THREE.Mesh(new THREE.ConeGeometry(0.2, 0.5, 8), new THREE.MeshBasicMaterial({color: 0xffff00})); nose.rotation.x = Math.PI/2; nose.position.z = 0.5; g.add(nose);
+    scene.add(g); this.vip = { body: b, mesh: g, hp: 100, speed: 3.5 };
+  }
+
+  update(t, dt) {
+    if(t > this.nextSpawn){ this.spawnEnemy(); this.nextSpawn = t + 3000 - this.wave * 100; }
+    const fW = CFG.field.width, fD = CFG.field.depth;
+    
+    if(this.vip && this.vip.hp > 0) {
+       this.vip.mesh.position.copy(this.vip.body.position); this.vip.mesh.quaternion.copy(this.vip.body.quaternion);
+       const distToGoal = this.vip.body.position.distanceTo(this.goalPos);
+       if(distToGoal > 1.0) {
+           const dir = new THREE.Vector3().subVectors(this.goalPos, this.vip.body.position).normalize();
+           this.vip.body.velocity.x = dir.x * this.vip.speed; this.vip.body.velocity.z = dir.z * this.vip.speed;
+           const angle = Math.atan2(dir.x, dir.z); this.vip.body.quaternion.setFromAxisAngle(new CANNON.Vec3(0,1,0), angle);
+       }
+       if(distToGoal < 1.5) {
+           showMsg("MISSION CLEAR!!", "#0f0"); spawnText("CLEAR", this.vip.mesh.position, "#0f0"); spawnConfetti(this.vip.mesh.position);
+           scene.remove(this.vip.mesh); world.removeBody(this.vip.body); this.vip = null; els.vipBox.style.display = 'none'; this.goalMarker.visible = false;
+           if(playerSystem) playerSystem.heal(50);
+       }
+    }
+
+    enemies.forEach(e => {
+      e.mesh.position.copy(e.body.position); e.mesh.quaternion.copy(e.body.quaternion);
+      if(e.body.position.y < -10) this.killEnemy(e);
+      const isOut = Math.abs(e.body.position.x) > fW/2+2 || Math.abs(e.body.position.z) > fD/2+2;
+      if(isOut){
+        if(!e.body.outsideTimer) e.body.outsideTimer = 0; 
+        e.body.outsideTimer += dt;
+        if(e.body.outsideTimer > 20.0){ showMsg("敵逃亡!", "#aaa"); this.removeEnemy(e); return; }
+        const cu = new CANNON.Vec3(0, 25, 0); const dr = cu.vsub(e.body.position); dr.normalize(); e.body.applyForce(dr.scale(e.isGiant ? 200 : 40), e.body.position);
+      } else {
+        e.body.outsideTimer = 0; 
+        const target = (this.vip && this.vip.hp > 0) ? this.vip.body.position : playerBody.position;
+        const d = target.vsub(e.body.position); d.normalize(); e.body.applyForce(d.scale(e.isGiant ? 100 : 20), e.body.position);
+        if(this.vip && this.vip.hp > 0 && e.body.position.distanceTo(this.vip.body.position) < 2.0 && Math.random() < 0.05){
+          this.vip.hp -= 5; els.vipHpBar.style.width = this.vip.hp + "%"; spawnParticle(this.vip.body.position, 5, 0xff0000);
+          if(this.vip.hp <= 0) { showMsg("護衛失敗...", "#f0f"); scene.remove(this.vip.mesh); world.removeBody(this.vip.body); this.vip = null; els.vipBox.style.display = 'none'; this.goalMarker.visible = false; }
+        }
+      }
+    });
+
+    items.forEach(i => {
+      i.mesh.position.copy(i.body.position); i.mesh.quaternion.copy(i.body.quaternion); i.mesh.rotation.y += dt;
+      if(playerBody.position.distanceTo(i.body.position) < 1.5) { if(playerSystem) playerSystem.heal(20); scene.remove(i.mesh); world.removeBody(i.body); items = items.filter(o => o !== i); }
+    });
+  }
 }
-function healPlayer(val) {
-  gameState.playerHp = Math.min(CFG.player.maxHp, gameState.playerHp + val);
-  els.hpText.textContent = gameState.playerHp; els.hpBar.style.width = (gameState.playerHp / CFG.player.maxHp * 100) + "%";
-  showMsg("RECOVER!", "#0f0");
-}
-function updateHUD() {
-  els.wVal.textContent = gameState.wave; els.kVal.textContent = gameState.kills; els.tVal.textContent = gameState.req; 
-  if(els.kekVal) els.kekVal.textContent = kekkaiList.length;
-}
-function showMsg(t, c) {
-  els.msg.textContent = t; els.msg.style.color = c; els.msg.style.opacity = 1; setTimeout(() => els.msg.style.opacity = 0, 800);
-}
+
+// ==========================================
+// UTILS & MAIN
+// ==========================================
+function updateHUD() { els.wVal.textContent = gameSystem ? gameSystem.wave : 1; els.kVal.textContent = gameSystem ? gameSystem.kills : 0; els.tVal.textContent = gameSystem ? gameSystem.req : 3; if(els.kekVal) els.kekVal.textContent = kekkaiList.length; }
+function showMsg(t, c) { els.msg.textContent = t; els.msg.style.color = c; els.msg.style.opacity = 1; setTimeout(() => els.msg.style.opacity = 0, 800); }
 function spawnText(s, p, c) {
   const cvs = document.createElement('canvas'); cvs.width = 64; cvs.height = 64;
   const ctx = cvs.getContext('2d'); ctx.font = "bold 48px sans-serif"; ctx.fillStyle = c; ctx.textAlign = 'center'; ctx.textBaseline = 'middle'; ctx.fillText(s, 32, 32);
@@ -259,324 +974,111 @@ function spawnText(s, p, c) {
   let f = 0; const a = () => { f += 0.03; sp.position.y += 0.05; sp.material.opacity = 1 - f; if (f < 1) requestAnimationFrame(a); else { scene.remove(sp); sp.material.map.dispose(); } }; a();
 }
 function spawnParticle(p, n, c) {
-  const g = new THREE.BoxGeometry(0.25, 0.25, 0.25), m = new THREE.MeshBasicMaterial({ color: c });
+  const g = new THREE.BoxGeometry(0.2, 0.2, 0.2); const m = new THREE.MeshBasicMaterial({ color: c });
   for (let i = 0; i < n; i++) {
-    const me = new THREE.Mesh(g, m); me.position.copy(p).add(new THREE.Vector3((Math.random() - .5) * 2, (Math.random() - .5) * 2, (Math.random() - .5) * 2)); scene.add(me);
-    const v = new THREE.Vector3(Math.random() - .5, Math.random() - .5, Math.random() - .5).multiplyScalar(1.5);
-    const a = () => { me.position.add(v); me.scale.multiplyScalar(0.92); if (me.scale.x > 0.05) requestAnimationFrame(a); else scene.remove(me); }; a();
+    const me = new THREE.Mesh(g, m); me.position.copy(p).add(new THREE.Vector3((Math.random()-.5)*2, (Math.random()-.5)*2, (Math.random()-.5)*2)); 
+    scene.add(me);
+    const v = new THREE.Vector3(Math.random()-.5, Math.random()-.5, Math.random()-.5).multiplyScalar(1.5);
+    const a = () => { me.position.add(v); me.scale.multiplyScalar(0.92); if(me.scale.x>0.05)requestAnimationFrame(a); else scene.remove(me); }; a();
   }
 }
-function updateAimMarker() {
-  if(!playerGroup || !aimMarker) return;
-  const e = new THREE.Euler(camAngle.pitch, camAngle.yaw, 0, 'YXZ');
-  const d = new THREE.Vector3(0, 0, -1).applyEuler(e);
-  const p = playerGroup.position.clone().add(d.multiplyScalar(currentDist));
-  p.y = Math.max(0.5, p.y); aimMarker.position.copy(p);
+function spawnConfetti(p) {
+  const g = new THREE.PlaneGeometry(0.2, 0.1); const matY = new THREE.MeshBasicMaterial({ color: 0xffd700, side:THREE.DoubleSide }); const matC = new THREE.MeshBasicMaterial({ color: 0x00ffff, side:THREE.DoubleSide });
+  for (let i = 0; i < 50; i++) {
+    const me = new THREE.Mesh(g, Math.random()>0.5 ? matY : matC); 
+    me.position.copy(p).add(new THREE.Vector3((Math.random()-.5)*4, (Math.random()-.5)*4, (Math.random()-.5)*4)); me.rotation.set(Math.random()*6, Math.random()*6, Math.random()*6);
+    scene.add(me);
+    const v = new THREE.Vector3((Math.random()-.5)*0.2, Math.random()*0.5, (Math.random()-.5)*0.2); let life = 1.0;
+    const a = () => { me.position.add(v); me.rotation.x += 0.1; me.rotation.y += 0.1; v.y -= 0.01; life -= 0.01; if (life > 0) requestAnimationFrame(a); else scene.remove(me); }; a();
+  }
 }
 
-// Kekkai Creation
-function createActiveKekkai(isPhysical, controller) {
-  const p = aimMarker.position.clone(), r = camAngle.yaw;
-  const g = new THREE.BoxGeometry(1, 1, 1);
-  const col = isPhysical ? 0xffff00 : CFG.colors.ghost;
-  const m = new THREE.MeshPhongMaterial({ color: col, transparent: true, opacity: 0.5, side: THREE.DoubleSide });
-  const mesh = new THREE.Mesh(g, m); 
-  mesh.add(new THREE.LineSegments(new THREE.EdgesGeometry(g), new THREE.LineBasicMaterial({ color: 0xffffff }))); 
-  mesh.position.copy(p); mesh.rotation.y = r; scene.add(mesh);
+let playerSystem, gameSystem, lastT = 0;
+
+function init() {
+  scene = new THREE.Scene(); scene.background = new THREE.Color(CFG.colors.sky); 
+  scene.fog = new THREE.FogExp2(CFG.colors.sky, 0.005);
   
-  let b = null;
-  if(isPhysical) {
-    b = new CANNON.Body({ mass: 0, material: new CANNON.Material('kek') }); 
-    b.position.copy(p); b.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), r); world.addBody(b);
-  }
-  
-  const handPos = new THREE.Vector3(); 
-  if(controller) controller.getWorldPosition(handPos);
-  
-  return { body: b, mesh: mesh, startP: p, startR: r, currentS: { x: 1, y: 1, z: 1 }, isPhysical: isPhysical, startHand: handPos, isVR: !!controller };
-}
+  camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200);
+  renderer = new THREE.WebGLRenderer({ antialias: true }); 
+  renderer.setSize(window.innerWidth, window.innerHeight); 
+  renderer.shadowMap.enabled = true; 
+  renderer.xr.enabled = true; 
+  renderer.xr.setReferenceSpaceType('local-floor');
+  document.body.appendChild(renderer.domElement);
 
-function updateActiveKekkai(k, dx, dy) {
-  const sensitivity = 8.0; // Gesture sensitivity
-  const sx = 1.0 + Math.max(0, dx * sensitivity);
-  const sy = 1.0 + Math.max(0, dy * sensitivity);
-  const sz = sx; 
-  k.currentS = { x: sx, y: sy, z: sz };
-  k.mesh.scale.set(sx, sy, sz);
-  const newY = k.startP.y + (sy - 1.0) / 2; 
-  k.mesh.position.y = newY; 
-  if(k.body) {
-    k.body.position.y = newY;
-    k.body.shapes = []; k.body.addShape(new CANNON.Box(new CANNON.Vec3(sx / 2, sy / 2, sz / 2)));
-  }
-}
-
-function finalizeKekkai() {
-  if(!activeKekkai) return;
-  const k = activeKekkai;
-  if(!k.isPhysical) {
-    const b = new CANNON.Body({ mass: 0, material: new CANNON.Material('kek') });
-    b.position.copy(k.mesh.position); b.quaternion.setFromAxisAngle(new CANNON.Vec3(0, 1, 0), k.startR);
-    b.addShape(new CANNON.Box(new CANNON.Vec3(k.currentS.x/2, k.currentS.y/2, k.currentS.z/2))); world.addBody(b); k.body = b;
-  }
-  k.mesh.material.color.setHex(CFG.colors.kekkai); k.mesh.material.opacity = 0.3;
-  kekkaiList.push({ body: k.body, mesh: k.mesh, shrinking: false }); 
-  spawnText(k.isPhysical ? "顕" : "結", k.mesh.position, "#0ff"); updateHUD();
-  activeKekkai = null;
-}
-
-function removeKekkai(k) {
-  scene.remove(k.mesh); world.removeBody(k.body); kekkaiList = kekkaiList.filter(o => o !== k); updateHUD();
-}
-
-function actionMetsu() {
-  let t = null, minD = 999; kekkaiList.forEach(k => { const d = playerBody.position.distanceTo(k.body.position); if (d < minD) { minD = d; t = k; } });
-  if (!t || t.shrinking) { showMsg("対象なし", "#888"); return; }
-  showMsg("滅！", "#f24"); spawnText("滅", t.mesh.position, "#f24"); t.shrinking = true; t.mesh.material.color.setHex(0xff0044);
-  const bbox = new THREE.Box3().setFromObject(t.mesh); let sc = 1.0;
-  const loop = () => {
-    if (!kekkaiList.includes(t)) return; sc -= 0.05; t.mesh.scale.setScalar(sc);
-    enemies.forEach(e => {
-      if (bbox.containsPoint(e.mesh.position)) {
-        const d = t.body.position.vsub(e.body.position); e.body.velocity.set(d.x * 8, d.y * 8, d.z * 8);
-        if (sc < 0.4) killEnemy(e);
+  // Manual VR Button Setup (Fixes navigator.xr error)
+  const btn = document.getElementById('vrStartBtn');
+  if ('xr' in navigator) {
+    navigator.xr.isSessionSupported('immersive-vr').then((supported) => {
+      if (supported) {
+        btn.style.display = 'block';
+        btn.addEventListener('click', onVRStart);
       }
     });
-    if (sc <= 0.1) { removeKekkai(t); spawnParticle(t.mesh.position, 30, 0xffaa00); } else requestAnimationFrame(loop);
-  }; loop();
-}
-function actionKai() { const t = kekkaiList[kekkaiList.length - 1]; if (t) { showMsg("解", "#4f8"); spawnText("解", t.mesh.position, "#4f8"); removeKekkai(t); } else showMsg("結界なし", "#888"); }
-
-function spawnEnemy() {
-  if (enemies.length >= 6 + gameState.wave) return;
-  const r = Math.random(); let x, y, z; const fW = CFG.field.width, fD = CFG.field.depth;
-  if (r < 0.6) { x = (Math.random() - .5) * fW; z = (Math.random() - .5) * fD; y = 20; } else if (r < 0.8) { x = (Math.random() - .5) * (fW - 5); z = (-fD / 2 - 20) + (Math.random() - .5) * 30; y = 35; } else { x = (fW / 2 - 25) + (Math.random() - .5) * 20; z = (Math.random() - .5) * 50; y = 10; }
-  if (Math.random() < 0.2) spawnGiant(x, y, z);
-  else {
-    const sz = 0.6 + Math.random() * 0.8, cl = new THREE.Color().setHSL(Math.random(), 0.8, 0.5), ms = 15 * sz;
-    const b = new CANNON.Body({ mass: ms, shape: new CANNON.Sphere(sz), material: new CANNON.Material('ene'), linearDamping: 0.4 });
-    b.position.set(x, y, z); world.addBody(b); b.outsideTimer = 0;
-    const m = new THREE.Mesh(new THREE.IcosahedronGeometry(sz, 0), new THREE.MeshStandardMaterial({ color: cl, roughness: 0.3 }));
-    scene.add(m); enemies.push({ body: b, mesh: m, isGiant: false });
   }
-  updateHUD();
-}
-function spawnGiant(x, y, z) {
-  const b = new CANNON.Body({ mass: 100, material: new CANNON.Material('ene'), linearDamping: 0.5 });
-  b.addShape(new CANNON.Sphere(1.5), new CANNON.Vec3(0, 0, 0)); b.addShape(new CANNON.Sphere(0.8), new CANNON.Vec3(0, 2, 0)); b.addShape(new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 1.5)), new CANNON.Vec3(0, 0.5, 0));
-  b.position.set(x, y, z); world.addBody(b); b.outsideTimer = 0;
-  const g = new THREE.Group();
-  const bm = new THREE.Mesh(new THREE.SphereGeometry(1.5), new THREE.MeshStandardMaterial({ color: CFG.colors.giant })); g.add(bm);
-  const hm = new THREE.Mesh(new THREE.SphereGeometry(0.8), new THREE.MeshStandardMaterial({ color: 0x550000 })); hm.position.y = 2; g.add(hm);
-  const am = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 3), new THREE.MeshStandardMaterial({ color: 0x330000 })); am.position.y = 0.5; g.add(am);
-  scene.add(g); enemies.push({ body: b, mesh: g, isGiant: true, hp: 5 });
-}
-function killEnemy(e) {
-  if (!enemies.includes(e)) return;
-  if (e.isGiant && e.hp > 0) {
-    e.hp--; spawnParticle(e.mesh.position, 10, 0xffaa00);
-    const push = playerBody.position.vsub(e.body.position); push.normalize(); e.body.applyImpulse(push.scale(-500), e.body.position);
-    if (e.hp > 0) return;
+
+  function onVRStart() {
+    const sessionInit = { optionalFeatures: [ 'local-floor', 'bounded-floor', 'hand-tracking' ] };
+    navigator.xr.requestSession( 'immersive-vr', sessionInit ).then( onSessionStarted );
   }
-  enemies = enemies.filter(o => o !== e); scene.remove(e.mesh); world.removeBody(e.body); spawnParticle(e.mesh.position, 25, 0xff0000);
-  if (Math.random() < 0.3) spawnItem(e.body.position);
-  gameState.kills++; gameState.req--; if (gameState.req <= 0) { gameState.wave++; gameState.req = gameState.wave * 2 + 4; showMsg(`WAVE ${gameState.wave}`, "#fe0"); if (gameState.wave % 3 === 0) startVipMission(); }
-  updateHUD();
-}
-function removeEnemy(e) { if (!enemies.includes(e)) return; enemies = enemies.filter(o => o !== e); scene.remove(e.mesh); world.removeBody(e.body); updateHUD(); }
-function spawnItem(pos) {
-  const b = new CANNON.Body({ mass: 1, shape: new CANNON.Box(new CANNON.Vec3(0.5, 0.5, 0.5)), material: new CANNON.Material('item') }); b.position.copy(pos); world.addBody(b);
-  const m = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 1), new THREE.MeshBasicMaterial({ color: CFG.colors.item, wireframe: true })); m.position.copy(pos); scene.add(m); m.add(new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: CFG.colors.item })));
-  items.push({ body: b, mesh: m });
-}
-function startVipMission() {
-  if (vip) return; gameState.isVipMode = true; showMsg("護衛任務開始!", "#0ff"); els.vipBox.style.display = "block";
-  const b = new CANNON.Body({ mass: 50, shape: new CANNON.Cylinder(0.5, 0.5, 1.8, 8), material: new CANNON.Material('ply'), fixedRotation: true, linearDamping: 0.5 });
-  b.position.set(0, 5, CFG.field.depth / 2 - 10); world.addBody(b);
-  const g = new THREE.Group(); g.add(new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 1.8, 16), new THREE.MeshStandardMaterial({ color: CFG.colors.vip })));
-  const h = new THREE.Mesh(new THREE.SphereGeometry(0.4), new THREE.MeshStandardMaterial({ color: 0xffcccc })); h.position.y = 1.0; g.add(h); scene.add(g);
-  vip = { body: b, mesh: g, hp: 100, goal: new CANNON.Vec3(0, 5, -CFG.field.depth / 2 + 30) };
-}
 
-function setupEnvironment(mat){
-  const sun=new THREE.DirectionalLight(0xffffee,1.2); sun.position.set(-50,100,50); sun.castShadow=true; sun.shadow.mapSize.set(2048,2048); scene.add(sun); scene.add(new THREE.AmbientLight(0x555566,0.6));
-  const gGeo=new THREE.PlaneGeometry(CFG.field.width+40,CFG.field.depth+40); const gMat=new THREE.MeshStandardMaterial({color:CFG.colors.ground,roughness:0.9});
-  const ground=new THREE.Mesh(gGeo,gMat); ground.rotation.x=-Math.PI/2; ground.receiveShadow=true; scene.add(ground);
-  const gBody=new CANNON.Body({mass:0,material:mat}); gBody.addShape(new CANNON.Plane()); gBody.quaternion.setFromEuler(-Math.PI/2,0,0); world.addBody(gBody);
+  function onSessionStarted( session ) {
+    session.addEventListener( 'end', onSessionEnded );
+    renderer.xr.setSession( session );
+    btn.style.display = 'none';
+    playerSystem.inputManager.setStrategy(new VRInputStrategy());
+    // Reset Position
+    dolly.position.set(0,5,30); playerBody.position.set(0,5,30);
+  }
 
-  const createBox=(x,y,z,w,h,d,col,tr=false,op=1)=>{
-    const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),new THREE.MeshStandardMaterial({color:col,transparent:tr,opacity:op})); m.position.set(x,y,z); m.castShadow=!tr; m.receiveShadow=true; scene.add(m);
-    const b=new CANNON.Body({mass:0,material:mat}); b.addShape(new CANNON.Box(new CANNON.Vec3(w/2,h/2,d/2))); b.position.copy(m.position); world.addBody(b); return m;
-  };
-  const FW=CFG.field.width,FD=CFG.field.depth,WH=8;
-  createBox(0,WH/2,FD/2+1,FW+2,WH,2,CFG.colors.wall); createBox(-FW/2-1,WH/2,0,2,WH,FD+2,CFG.colors.wall); createBox(FW/2+1,WH/2,0,2,WH,FD+2,CFG.colors.wall);
-  const bH=30,bZ=-FD/2-20; createBox(0,bH/2,bZ,FW,bH,40,CFG.colors.building);
-  for(let i=-FW/2+5;i<FW/2;i+=10)for(let j=5;j<28;j+=7){const w=new THREE.Mesh(new THREE.PlaneGeometry(4,4),new THREE.MeshBasicMaterial({color:0x87CEFA})); w.position.set(i,j,bZ+20+0.1); scene.add(w);}
+  function onSessionEnded() {
+    playerSystem.inputManager.setStrategy(new MobileInputStrategy());
+    btn.style.display = 'block';
+  }
 
-  const stW=8, stRun=60, stRise=30, stZ=bZ+20+stW/2, slopeThickness=1.0, midY=stRise/2 - slopeThickness/2;
-  const createSlope = (startX, endX) => {
-    const run = Math.abs(endX - startX), len = Math.sqrt(run*run + stRise*stRise), ang = Math.atan2(stRise, run), midX = (startX + endX)/2;
-    const b=new CANNON.Body({mass:0,material:mat}); b.addShape(new CANNON.Box(new CANNON.Vec3(len/2, slopeThickness/2, stW/2))); b.position.set(midX, midY, stZ);
-    const dir = (endX > startX) ? 1 : -1; b.quaternion.setFromEuler(0, 0, dir * ang); world.addBody(b);
-    const m=new THREE.Mesh(new THREE.BoxGeometry(len,slopeThickness,stW), new THREE.MeshStandardMaterial({color:0xdddddd})); m.position.copy(b.position); m.quaternion.copy(b.quaternion); m.receiveShadow=true; m.castShadow=true; scene.add(m);
-    const r=new THREE.Mesh(new THREE.BoxGeometry(len,0.5,0.2), new THREE.MeshStandardMaterial({color:0x888888})); r.position.copy(b.position); r.position.add(new THREE.Vector3(0, slopeThickness/2+2.0, 0).applyEuler(new THREE.Euler(0,0,dir*ang))); r.position.z += stW/2 - 0.2; r.quaternion.copy(b.quaternion); scene.add(r);
-    
-    // Landings
-    const landW=6;
-    createBox(startX - dir*(landW/2), 0.25, stZ, landW, 0.5, stW, 0xdddddd);
-    const topX = endX + dir*(landW/2);
-    createBox(topX, stRise, stZ, landW, 0.5, stW, 0xdddddd);
-    createBox(topX, stRise, (stZ+(bZ+20))/2-10, landW, 0.5, 25, 0xdddddd);
-    createBox(topX + dir*(landW/2), stRise+1.5, stZ, 0.2, 3, stW, 0x888888);
-    createBox(topX, stRise+1.5, stZ+stW/2, landW, 3, 0.2, 0x888888);
-  };
-  createSlope(5, 55); createSlope(-5, -55);
+  world = new CANNON.World(); world.gravity.set(0, -30, 0);
 
-  const rY=bH, rW=FW, rD=40; createBox(0,rY+1,bZ-rD/2,rW,2,0.5,0x888888); createBox(-rW/2,rY+1,bZ,0.5,2,rD,0x888888); createBox(rW/2,rY+1,bZ,0.5,2,rD,0x888888);
-  const gateW=8, rightGateX=55, leftGateX=-55;
-  const centerFenceW=(rightGateX-gateW/2)-(leftGateX+gateW/2); createBox(0,rY+1,bZ+rD/2,centerFenceW,2,0.5,0x888888);
-  const leftFenceW=(leftGateX-gateW/2)-(-rW/2); createBox(-rW/2+leftFenceW/2,rY+1,bZ+rD/2,leftFenceW,2,0.5,0x888888);
-  const rightFenceW=(rW/2)-(rightGateX+gateW/2); createBox(rW/2-rightFenceW/2,rY+1,bZ+rD/2,rightFenceW,2,0.5,0x888888);
+  playerSystem = new PlayerSystem();
+  gameSystem = new GameSystem();
+  menuSystem = new VRMenuSystem();
 
-  const pX=FW/2-25, pZ=0, pW=30, pD=60, wT=1.0;
-  createBox(pX,1.0,pZ,pW,2.0,pD,CFG.colors.pool); createBox(pX,3.0,pZ-pD/2,pW,2.0,wT,CFG.colors.pool); createBox(pX,3.0,pZ+pD/2,pW,2.0,wT,CFG.colors.pool); createBox(pX-pW/2,3.0,pZ,wT,2.0,pD,CFG.colors.pool); createBox(pX+pW/2,3.0,pZ,wT,2.0,pD,CFG.colors.pool);
-  const wtMat=new THREE.MeshBasicMaterial({color:0x00aaff, transparent:true, opacity:0.6, side:THREE.DoubleSide}), wt=new THREE.Mesh(new THREE.PlaneGeometry(pW-wT*2,pD-wT*2), wtMat);
-  wt.rotation.x=-Math.PI/2; wt.position.set(pX,3.0,pZ); scene.add(wt);
-  
-  const psW=4, psL=20, psX=pX-pW/2-psW/2, psZ=pZ, psH=3.0, psAng=Math.atan2(psH, psL);
-  const psThickness=0.4, psB=new CANNON.Body({mass:0,material:mat});
-  psB.addShape(new CANNON.Box(new CANNON.Vec3(psW/2, psThickness/2, Math.sqrt(psL*psL+psH*psH)/2)));
-  psB.position.set(psX, psH/2-psThickness/2, psZ); psB.quaternion.setFromEuler(-psAng,0,0); world.addBody(psB);
-  const psM=new THREE.Mesh(new THREE.BoxGeometry(psW,psThickness,Math.sqrt(psL*psL+psH*psH)), new THREE.MeshStandardMaterial({color:0xcccccc}));
-  psM.position.copy(psB.position); psM.quaternion.copy(psB.quaternion); psM.receiveShadow=true; scene.add(psM);
+  const modelFactory = new XRControllerModelFactory();
+  raycaster = new THREE.Raycaster();
+  const lineGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,0,0), new THREE.Vector3(0,0,-5)]);
+  raycaster.line = new THREE.Line(lineGeo, new THREE.LineBasicMaterial({ color: 0xff0000 }));
 
-  const pfH=1.5, pOutW=pW+2, pOutD=pD+2; const cf=(x,z,w,d)=>{const f=new THREE.Mesh(new THREE.BoxGeometry(w,pfH,d),new THREE.MeshStandardMaterial({color:0xdddddd,transparent:true,opacity:0.3}));f.position.set(x,2.0+pfH/2,z);scene.add(f);const b=new CANNON.Body({mass:0});b.addShape(new CANNON.Box(new CANNON.Vec3(w/2,pfH/2,d/2)));b.position.copy(f.position);world.addBody(b);};
-  cf(pX+pOutW/2, pZ, 0.2, pOutD); cf(pX, pZ-pOutD/2, pOutW, 0.2); cf(pX, pZ+pOutD/2, pOutW, 0.2);
-  const gap=14; cf(pX-pOutW/2, pZ-(pD/2+gap)/2, 0.2, pD/2-gap); cf(pX-pOutW/2, pZ+(pD/2+gap)/2, 0.2, pD/2-gap);
-  const gZ=FD/2; createBox(-15,5,gZ,5,10,5,0x888888); createBox(15,5,gZ,5,10,5,0x888888); createBox(0,4,gZ,25,8,1,0x555555);
+  for(let i=0; i<2; i++){
+     const c = renderer.xr.getController(i);
+     const g = renderer.xr.getControllerGrip(i);
+     g.add(modelFactory.createControllerModel(g));
+     dolly.add(c); dolly.add(g); 
+     
+     c.addEventListener('connected', (e)=>{
+         const hand = e.data.handedness;
+         controllers[hand] = c;
+         controllerGrips[hand] = g;
+         c.userData.handedness = hand;
+     });
+     c.addEventListener('selectstart', () => { c.userData.isTriggerPressed = true; });
+     c.addEventListener('selectend', () => { c.userData.isTriggerPressed = false; });
+  }
+
+  renderer.setAnimationLoop(loop);
 }
 
-function setupInputs(){
-  // Stick (Mobile)
-  els.stick.addEventListener('touchstart',e=>{e.preventDefault();if(stickId!==null)return;const t=e.changedTouches[0];stickId=t.identifier;const r=els.stick.getBoundingClientRect();stickStart={x:r.left+r.width/2,y:r.top+r.height/2};tapTime=Date.now();tapPos={x:t.clientX,y:t.clientY};moveStick(t.clientX,t.clientY);},{passive:false});
-  els.stick.addEventListener('touchmove',e=>{e.preventDefault();for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===stickId)moveStick(e.changedTouches[i].clientX,e.changedTouches[i].clientY);},{passive:false});
-  const endStick=e=>{for(let i=0;i<e.changedTouches.length;i++){const t=e.changedTouches[i];if(t.identifier===stickId){if(Date.now()-tapTime<200&&Math.hypot(t.clientX-tapPos.x,t.clientY-tapPos.y)<15){if(playerBody&&Math.abs(playerBody.velocity.y)<1)playerBody.velocity.y=CFG.player.jump;}stickId=null;input.x=0;input.y=0;els.knob.style.transform='translate(-50%,-50%)';}}};
-  els.stick.addEventListener('touchend',endStick);els.stick.addEventListener('touchcancel',endStick);
-  function moveStick(cx,cy){let dx=cx-stickStart.x,dy=cy-stickStart.y;const d=Math.hypot(dx,dy),max=(els.stick.offsetWidth/2)*0.8;if(d>max){dx*=max/d;dy*=max/d;}input.x=dx/max;input.y=dy/max;els.knob.style.transform=`translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px))`;}
-  // Camera (Mobile)
-  renderer.domElement.addEventListener('touchstart',e=>{e.preventDefault();for(let i=0;i<e.changedTouches.length;i++){if(lookId===null&&e.changedTouches[i].target===renderer.domElement){lookId=e.changedTouches[i].identifier;lastLook={x:e.changedTouches[i].clientX,y:e.changedTouches[i].clientY};}}},{passive:false});
-  renderer.domElement.addEventListener('touchmove',e=>{e.preventDefault();if(lookId===null)return;for(let i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===lookId){const t=e.changedTouches[i];camAngle.yaw-=(t.clientX-lastLook.x)*0.004;camAngle.pitch-=(t.clientY-lastLook.y)*0.004;camAngle.pitch=Math.max(-1.5,Math.min(1.5,camAngle.pitch));lastLook={x:t.clientX,y:t.clientY};}}},{passive:false});
-  const endLook=e=>{for(let i=0;i<e.changedTouches.length;i++)if(e.changedTouches[i].identifier===lookId)lookId=null;};
-  renderer.domElement.addEventListener('touchend',endLook);
-  // Buttons (Mobile)
-  els.btnJump.addEventListener('touchstart',e=>{e.preventDefault();if(playerBody&&Math.abs(playerBody.velocity.y)<1)playerBody.velocity.y=CFG.player.jump;});
-  els.btnDist.addEventListener('touchstart',e=>{e.preventDefault();currentDist=(currentDist===CFG.dist.near)?CFG.dist.far:CFG.dist.near;els.distLabel.textContent=(currentDist===CFG.dist.near)?"近":"遠";showMsg(`射程: ${els.distLabel.textContent}`,"#fff");});
-  els.btnAct.addEventListener('touchstart',e=>{e.preventDefault();if(actId!==null)return;const t=e.changedTouches[0];actId=t.identifier;actStartPos={x:t.clientX,y:t.clientY};});
-  els.btnAct.addEventListener('touchend',e=>{e.preventDefault();for(let i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===actId){const t=e.changedTouches[i];if(Math.hypot(t.clientX-actStartPos.x,t.clientY-actStartPos.y)>20)actionKai();else actionMetsu();actId=null;}}});
-  els.modeBtn.addEventListener('touchstart',e=>{e.preventDefault(); e.stopPropagation(); isPhysMode = !isPhysMode; els.modeBtn.textContent = isPhysMode ? "モード: 顕現" : "モード: 幽体"; els.modeBtn.className = isPhysMode ? "phys" : "ghost"; els.btnDraw.style.background = isPhysMode ? "linear-gradient(135deg, #FFD700, #FF8C00)" : "linear-gradient(135deg, #03a9f4, #0288d1)"; els.btnDraw.innerHTML = isPhysMode ? "顕<br><span style='font-size:10px'>Hold</span>" : "結<br><span style='font-size:10px'>Hold</span>"; showMsg(isPhysMode ? "物理顕現モード" : "幽体結界モード", "#fff");});
-  // Draw (Mobile)
-  els.btnDraw.addEventListener('touchstart',e=>{
-    e.preventDefault(); if(drawId!==null)return; if(kekkaiList.length>=CFG.kekkai.max){showMsg("上限到達","#f44");return;}
-    const t=e.changedTouches[0]; drawId=t.identifier; els.btnDraw.classList.add('drawing');
-    if(isPhysMode) { activeKekkai = createActiveKekkai(true, null); activeKekkai.startX=t.clientX; activeKekkai.startY=t.clientY; }
-    else { activeKekkai = createActiveKekkai(false, null); activeKekkai.startX=t.clientX; activeKekkai.startY=t.clientY; }
-  });
-  els.btnDraw.addEventListener('touchmove',e=>{
-    e.preventDefault(); if(drawId===null||!activeKekkai)return;
-    for(let i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===drawId){
-      const t=e.changedTouches[i]; const dx=Math.abs(t.clientX-activeKekkai.startX)*0.06, dy=(activeKekkai.startY-t.clientY)*0.06; updateActiveKekkai(activeKekkai, dx, dy);
-    }}
-  });
-  els.btnDraw.addEventListener('touchend',e=>{
-    e.preventDefault(); for(let i=0;i<e.changedTouches.length;i++){if(e.changedTouches[i].identifier===drawId){
-      if(activeKekkai) { finalizeKekkai(activeKekkai); activeKekkai=null; }
-      drawId=null; els.btnDraw.classList.remove('drawing');
-    }}
-  });
-}
-
-function loop(t){
-  const dt=Math.min((t-lastT)/1000,0.1); lastT=t;
+function loop(t) {
+  const dt = Math.min((t - lastT) / 1000, 0.1); 
+  lastT = t;
   world.step(1/60, dt, 3);
-  if(renderer.xr.isPresenting){
-    const s=renderer.xr.getSession();
-    if(s){
-      for(const src of s.inputSources){
-        if(!src.gamepad)continue;const gp=src.gamepad;
-        // Left
-        if(src.handedness==='left'){
-           if(gp.axes.length>=4){input.x=gp.axes[2];input.y=gp.axes[3];}
-           if(gp.buttons[3]?.pressed&&Math.abs(playerBody.velocity.y)<1)playerBody.velocity.y=CFG.player.jump; // X Button (3)
-           // Left Grip (Phys)
-           if(gp.buttons[1]?.pressed){
-             if(!activeKekkai){
-               const c = controllers[src.handedness]; activeKekkai = createActiveKekkai(true, c);
-             } else if(activeKekkai.isPhysical && activeKekkai.isVR){
-               const c = controllers[src.handedness]; const currPos = new THREE.Vector3(); c.getWorldPosition(currPos);
-               const dx = Math.abs(currPos.x - activeKekkai.startHand.x) + Math.abs(currPos.z - activeKekkai.startHand.z);
-               const dy = Math.abs(currPos.y - activeKekkai.startHand.y);
-               updateActiveKekkai(activeKekkai, dx, dy);
-             }
-           } else { if(activeKekkai && activeKekkai.isPhysical){ finalizeKekkai(activeKekkai); activeKekkai=null; } }
-           // Left Trig (Kai)
-           const kai=gp.buttons[0]?.pressed; if(kai && !vrState.lastActL) actionKai(); vrState.lastActL=kai;
-        }
-        // Right
-        if(src.handedness==='right'){
-           if(gp.axes.length>=4 && Math.abs(gp.axes[2])>0.5) camAngle.yaw-=gp.axes[2]*0.04; // Snap turn
-           // Jump (A button: 4)
-           if(gp.buttons[4]?.pressed && Math.abs(playerBody.velocity.y)<1) playerBody.velocity.y=CFG.player.jump;
-           // Dist (B button: 5)
-           const dist = gp.buttons[5]?.pressed;
-           if(dist && !vrState.lastDist){ currentDist=(currentDist===CFG.dist.near)?CFG.dist.far:CFG.dist.near; showMsg(currentDist===CFG.dist.near?"近":"遠", "#fff"); } vrState.lastDist=dist;
-           
-           // Right Grip (Ghost)
-           if(gp.buttons[1]?.pressed){
-              if(!activeKekkai && kekkaiList.length<CFG.kekkai.max){
-                 const c = controllers[src.handedness]; activeKekkai = createActiveKekkai(false, c);
-              } else if(!activeKekkai.isPhysical && activeKekkai.isVR){
-                 const c = controllers[src.handedness]; const currPos = new THREE.Vector3(); c.getWorldPosition(currPos);
-                 const dx = Math.abs(currPos.x - activeKekkai.startHand.x) + Math.abs(currPos.z - activeKekkai.startHand.z);
-                 const dy = Math.abs(currPos.y - activeKekkai.startHand.y);
-                 updateActiveKekkai(activeKekkai, dx, dy);
-              }
-           } else { if(activeKekkai && !activeKekkai.isPhysical){ finalizeKekkai(activeKekkai); activeKekkai=null; } }
-           
-           // Right Trig (Metsu)
-           const metsu=gp.buttons[0]?.pressed; if(metsu && !vrState.lastActR) actionMetsu(); vrState.lastActR=metsu;
-        }
-      }
-    }
-    const cam=renderer.xr.getCamera(),d=new THREE.Vector3();cam.getWorldDirection(d);d.y=0;d.normalize();
-    const r=new THREE.Vector3().crossVectors(d,new THREE.Vector3(0,1,0)),m=d.multiplyScalar(-input.y).add(r.multiplyScalar(input.x)).multiplyScalar(CFG.player.speed);
-    playerBody.velocity.x=m.x;playerBody.velocity.z=m.z;playerGroup.position.copy(playerBody.position);
-    playerGroup.rotation.y = camAngle.yaw;
-  }else{
-    const yaw=camAngle.yaw,fwd=new THREE.Vector3(input.x,0,input.y).applyAxisAngle(new THREE.Vector3(0,1,0),yaw);
-    playerBody.velocity.x=fwd.x*CFG.player.speed;playerBody.velocity.z=fwd.z*CFG.player.speed;
-    playerGroup.position.copy(playerBody.position).add(new THREE.Vector3(0,CFG.player.height,0));
-    playerGroup.rotation.y=yaw;camera.rotation.x=camAngle.pitch;
-  }
-  updateAimMarker();
-  if(t>gameState.nextSpawn){spawnEnemy();gameState.nextSpawn=t+3000-gameState.wave*100;}
-  const fW=CFG.field.width, fD=CFG.field.depth;
-  enemies.forEach(e=>{
-    e.mesh.position.copy(e.body.position); e.mesh.quaternion.copy(e.body.quaternion);
-    if(e.body.position.y<-10)killEnemy(e);
-    const isOut=Math.abs(e.body.position.x)>fW/2+2 || Math.abs(e.body.position.z)>fD/2+2;
-    if(isOut){
-      if(!e.body.outsideTimer)e.body.outsideTimer=0; e.body.outsideTimer+=dt;
-      if(e.body.outsideTimer>20.0){showMsg("敵逃亡!","#aaa");removeEnemy(e);return;}
-      const cu=new CANNON.Vec3(0,25,0), dr=cu.vsub(e.body.position); dr.normalize(); e.body.applyForce(dr.scale(e.isGiant?200:40),e.body.position);
-    }else{
-      e.body.outsideTimer=0; const target=(vip&&vip.hp>0)?vip.body.position:playerBody.position;
-      const d=target.vsub(e.body.position); d.normalize(); e.body.applyForce(d.scale(e.isGiant?100:20),e.body.position);
-      if(vip&&e.body.position.distanceTo(vip.body.position)<2.0&&Math.random()<0.05){vip.hp-=5;spawnParticle(vip.body.position,5,0xff0000);}
-    }
-  });
-  renderer.render(scene,camera);
+  
+  if(menuSystem) menuSystem.updateInteraction();
+  if(playerSystem) playerSystem.update(dt);
+  if(gameSystem) gameSystem.update(t, dt);
+  
+  renderer.render(scene, camera);
 }
-document.getElementById('vrBtn').addEventListener('click', ()=>{ if(navigator.xr) navigator.xr.requestSession('immersive-vr').then(s=>{ renderer.xr.setSession(s); document.getElementById('uiLayer').style.display='none'; }); });
+
 window.onload = init;
 </script>
 </body>
