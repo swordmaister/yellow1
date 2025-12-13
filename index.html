@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<title>真・結界師VR — Final Perfect v3 (Config)</title>
+<title>真・結界師VR — Final Perfect v3.2</title>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#87CEEB">
 <style>
@@ -12,7 +12,6 @@
   #error-log { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.9); color:#ff5555; padding:20px; z-index:9999; white-space:pre-wrap; font-weight:bold; overflow:auto; }
   #damage-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: radial-gradient(circle, transparent 60%, red 100%); opacity: 0; pointer-events: none; z-index: 50; transition: opacity 0.1s; }
 
-  /* UI Elements */
   .novr-only { transition: opacity 0.5s; }
 
   #hud { position: fixed; top: 16px; left: 16px; pointer-events: none; z-index: 10; }
@@ -24,18 +23,10 @@
   .hp-bar-bg { width: 100%; height: 8px; background: #555; margin-top: 4px; border-radius: 4px; overflow: hidden; }
   .hp-bar-val { width: 100%; height: 100%; background: #0f0; transition: width 0.2s; }
   
-  /* バージョン表示用のスタイル */
-  #versionText { 
-    position: absolute; 
-    top: 0; 
-    right: -100px; /* HUDボックスの外に配置 */
-    font-size: 10px; 
-    color: rgba(255, 255, 255, 0.7); 
-    text-shadow: 1px 1px 0 #000;
-  }
+  #versionText { position: absolute; top: 0; right: -100px; font-size: 12px; color: rgba(255,255,255,0.8); text-shadow: 1px 1px 0 #000; font-weight:bold; }
 
   #msgArea { position: fixed; top: 35%; left: 0; width: 100%; text-align: center; pointer-events: none; z-index: 20; }
-  .flash-msg { font-size: 60px; font-weight: 900; color: #fff; text-shadow: 0 0 20px #f0a, 3px 3px 0 #000; opacity: 0; transition: opacity 0.1s; transform: scale(0.8); }
+  .flash-msg { font-size: 40px; font-weight: 900; color: #fff; text-shadow: 0 0 10px #000, 2px 2px 0 #000; opacity: 0; transition: opacity 0.1s; white-space: pre-wrap; }
 
   /* Mobile Controllers */
   #uiLayer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
@@ -98,8 +89,7 @@ import * as CANNON from 'cannon-es';
 // 1. CONFIG
 // --------------------------------------------------
 const CFG = {
-  // ★★★ 修正 2: バージョン定数の追加 ★★★
-  VERSION: "v3.1",
+  VERSION: "v3.2",
   colors: {
     sky: 0x87CEEB, ground: 0xC2B280, 
     kekkai: 0xffff00, ghost: 0x00ffff, 
@@ -110,12 +100,13 @@ const CFG = {
     wood: 0x8B4513, leaf: 0x228B22, iron: 0x333333, concrete: 0xaaaaaa
   },
   player: { speed: 10.0, jump: 22.0, height: 1.7, maxHp: 100 },
-  kekkai: { max: 10, sensitivity: 30.0 }, // 感度30倍
+  kekkai: { max: 10, sensitivity: 30.0 },
   dist: { near: 6.0, far: 20.0 },
   field: { width: 120, depth: 160 },
+  // ★設定機能の初期値（ご要望通り「視点基準」をデフォルトに）
   settings: {
-    moveRef: 'view',    // 'view' (視点基準) or 'world' (東西南北)
-    barrierRef: 'view'  // 'view' (視点中央) or 'world' (フィールド中央)
+    moveRef: 'view',    // 'view' (視点基準) / 'world' (東西南北)
+    barrierRef: 'view'  // 'view' (視点中央) / 'world' (フィールド中央)
   }
 };
 
@@ -130,26 +121,14 @@ let currentDist = CFG.dist.near, aimMarker, isPhysMode = false;
 let controllers = [], controllerGrips = [], vrHudMesh, vrHudCtx, vipGoalMesh = null;
 let currentSession = null, lastT = 0;
 
-// VR State
 let vrState = {
   left: { 
-    drawing: false, 
-    startHandPos: new THREE.Vector3(), 
-    startOrigin: new THREE.Vector3(),
-    mesh: null, 
-    body: null,
-    triggerHeld: false,
-    xBtnHeld: false, // 設定変更用
-    yBtnHeld: false  // 設定変更用
+    drawing: false, startHandPos: new THREE.Vector3(), startOrigin: new THREE.Vector3(),
+    mesh: null, body: null, triggerHeld: false, xBtnHeld: false, yBtnHeld: false 
   },
   right: { 
-    drawing: false, 
-    startHandPos: new THREE.Vector3(),
-    startOrigin: new THREE.Vector3(),
-    mesh: null, 
-    triggerHeld: false, 
-    bBtnHeld: false,
-    snapTurn: false 
+    drawing: false, startHandPos: new THREE.Vector3(), startOrigin: new THREE.Vector3(),
+    mesh: null, triggerHeld: false, bBtnHeld: false, snapTurn: false 
   }
 };
 
@@ -158,26 +137,14 @@ let drawId = null, drawState = { active: false, startX: 0, startY: 0, ghost: nul
 let stickId = null, stickStart = { x: 0, y: 0 }, tapTime = 0, tapPos = { x: 0, y: 0 };
 let actId = null, actStartPos = { x: 0, y: 0 }, lookId = null, lastLook = { x: 0, y: 0 };
 
-// ★★★ 修正 3: 新しい要素を els に追加 ★★★
-const els = { 
-  stick: document.getElementById('stickZone'), knob: document.getElementById('stickKnob'), 
-  msg: document.getElementById('flashMsg'), btnDist: document.getElementById('btnUp'), 
-  btnJump: document.getElementById('btnDown'), btnAct: document.getElementById('btnLeft'), 
-  btnDraw: document.getElementById('btnRight'), modeBtn: document.getElementById('modeSwitch'), 
-  distLabel: document.getElementById('distLabel'), wVal: document.getElementById('waveVal'), 
-  kVal: document.getElementById('killVal'), tVal: document.getElementById('targetVal'), 
-  hpText: document.getElementById('hpText'), hpBar: document.getElementById('hpBar'), 
-  dmgOverlay: document.getElementById('damage-overlay'), vipBox: document.getElementById('vipBox'), 
-  vipHpBar: document.getElementById('vipHpBar'), novr: document.querySelectorAll('.novr-only'),
-  version: document.getElementById('versionText') // 新規追加
-};
+const els = { stick: document.getElementById('stickZone'), knob: document.getElementById('stickKnob'), msg: document.getElementById('flashMsg'), btnDist: document.getElementById('btnUp'), btnJump: document.getElementById('btnDown'), btnAct: document.getElementById('btnLeft'), btnDraw: document.getElementById('btnRight'), modeBtn: document.getElementById('modeSwitch'), distLabel: document.getElementById('distLabel'), wVal: document.getElementById('waveVal'), kVal: document.getElementById('killVal'), tVal: document.getElementById('targetVal'), hpText: document.getElementById('hpText'), hpBar: document.getElementById('hpBar'), dmgOverlay: document.getElementById('damage-overlay'), vipBox: document.getElementById('vipBox'), vipHpBar: document.getElementById('vipHpBar'), novr: document.querySelectorAll('.novr-only'), version: document.getElementById('versionText') };
 
 // --------------------------------------------------
 // 3. HELPER FUNCTIONS
 // --------------------------------------------------
 function showMsg(t, c) { 
   els.msg.textContent = t; els.msg.style.color = c; els.msg.style.opacity = 1; 
-  setTimeout(() => els.msg.style.opacity = 0, 800); 
+  setTimeout(() => els.msg.style.opacity = 0, 1500); 
 }
 function spawnText(s, p, c) { 
   const cvs = document.createElement('canvas'); cvs.width = 128; cvs.height = 64; 
@@ -185,10 +152,7 @@ function spawnText(s, p, c) {
   const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cvs), transparent: true })); 
   sp.position.copy(p); sp.scale.set(3, 1.5, 3); scene.add(sp); 
   let f = 0; 
-  const a = () => { 
-    f += 0.05; sp.position.y += 0.03; sp.material.opacity = 1 - f; 
-    if (f < 1) requestAnimationFrame(a); else { scene.remove(sp); sp.material.map.dispose(); sp.geometry.dispose(); } 
-  }; 
+  const a = () => { f += 0.05; sp.position.y += 0.03; sp.material.opacity = 1 - f; if (f < 1) requestAnimationFrame(a); else { scene.remove(sp); sp.material.map.dispose(); sp.geometry.dispose(); } }; 
   a(); 
 }
 function spawnParticle(p, n, c) { 
@@ -211,8 +175,8 @@ function updateHUD() {
     const ctx = vrHudCtx; ctx.clearRect(0, 0, 512, 128); 
     ctx.fillStyle = "rgba(0, 20, 40, 0.6)"; ctx.fillRect(0,0,512,128); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(2,2,508,124); 
     
-    // VR HUDにバージョン情報を表示
-    ctx.font = "18px sans-serif"; ctx.fillStyle = "rgba(255, 255, 255, 0.7)"; ctx.fillText(`V: ${CFG.VERSION}`, 400, 15);
+    // VR HUD バージョン表示
+    ctx.font = "18px sans-serif"; ctx.fillStyle = "rgba(255, 255, 255, 0.7)"; ctx.fillText(`V: ${CFG.VERSION}`, 430, 25);
     
     ctx.font = "bold 30px sans-serif"; ctx.fillStyle = "#ffeb3b"; ctx.fillText(`WAVE ${gameState.wave}`, 20, 40); 
     ctx.fillStyle = "#fff"; ctx.font = "24px sans-serif"; ctx.fillText(`撃破: ${gameState.kills} / 残: ${gameState.req}`, 20, 80); 
@@ -222,7 +186,6 @@ function updateHUD() {
     vrHudMesh.material.map.needsUpdate = true; 
   } else { 
     els.wVal.textContent = gameState.wave; els.kVal.textContent = gameState.kills; els.tVal.textContent = gameState.req; 
-    // Non-VR HUDのバージョン表示はinit時に設定
   } 
 }
 function takeDamage(val) { 
@@ -305,46 +268,28 @@ function spawnEnemy() {
 function actionMetsu() { 
   let t = null, minD = 999; 
   const pPos = renderer.xr.isPresenting ? playerGroup.position : playerBody.position; 
-  
   kekkaiList.forEach(k => { 
     if(!k.isGhost) return; 
     const d = pPos.distanceTo(k.mesh.position); 
     if (d < minD) { minD = d; t = k; } 
   }); 
   if (!t || t.shrinking) { showMsg("対象なし", "#888"); return; } 
-  
   showMsg("滅！", "#f24"); spawnText("滅", t.mesh.position, "#f24"); 
   t.shrinking = true; t.mesh.material.color.setHex(0xff0044); 
-  
   if (t.body) { world.removeBody(t.body); t.body = null; } 
-  
-  const bbox = new THREE.Box3().setFromObject(t.mesh); 
-  let sc = t.mesh.scale.x; 
-  
+  const bbox = new THREE.Box3().setFromObject(t.mesh); let sc = t.mesh.scale.x; 
   const loop = () => { 
     if (!kekkaiList.includes(t)) return; 
     sc -= 0.1; t.mesh.scale.setScalar(sc); 
-    
-    enemies.forEach(e => { 
-      if (bbox.containsPoint(e.mesh.position)) { 
-        killEnemy(e); 
-      } 
-    }); 
-    
-    if (sc <= 0.1) { 
-      removeKekkai(t); 
-      spawnParticle(t.mesh.position, 30, 0xffaa00); 
-    } else {
-      requestAnimationFrame(loop); 
-    }
+    enemies.forEach(e => { if (bbox.containsPoint(e.mesh.position)) { killEnemy(e); } }); 
+    if (sc <= 0.1) { removeKekkai(t); spawnParticle(t.mesh.position, 30, 0xffaa00); } else { requestAnimationFrame(loop); }
   }; loop(); 
 }
 
 function actionKai() { 
   if (kekkaiList.length > 0) { 
     const t = kekkaiList[kekkaiList.length - 1]; 
-    showMsg("解", "#4f8"); spawnText("解", t.mesh.position, "#4f8"); 
-    removeKekkai(t); 
+    showMsg("解", "#4f8"); spawnText("解", t.mesh.position, "#4f8"); removeKekkai(t); 
   } else { showMsg("結界なし", "#888"); } 
 }
 
@@ -357,11 +302,8 @@ function updateAimMarker() {
     
     // 設定による基準点の変更
     if (CFG.settings.barrierRef === 'world') {
-      // ワールド基準: フィールド中央付近(Y=5)
-      aimMarker.position.set(0, 5, 0);
-      aimMarker.rotation.set(0,0,0);
+      aimMarker.position.set(0, 5, 0); aimMarker.rotation.set(0,0,0);
     } else {
-      // 視点基準 (デフォルト)
       aimMarker.position.copy(cam.position).add(dir.multiplyScalar(currentDist)); 
       aimMarker.rotation.y = Math.atan2(dir.x, dir.z);
     }
@@ -431,8 +373,7 @@ function handleVRInput() {
   if (!session) return;
 
   const cam = renderer.xr.getCamera();
-  
-  // 移動用ベクトルの計算 (ループ外で一度計算)
+  // 移動用ベクトル計算
   const headDir = new THREE.Vector3(); cam.getWorldDirection(headDir);
   headDir.y = 0; headDir.normalize();
   const headRight = new THREE.Vector3(-headDir.z, 0, headDir.x);
@@ -452,7 +393,6 @@ function handleVRInput() {
         const stickX = gp.axes[2]; 
         const stickY = gp.axes[3]; 
         if (Math.abs(stickX) > 0.1 || Math.abs(stickY) > 0.1) {
-          
           if (CFG.settings.moveRef === 'view') {
             // [視点基準] (デフォルト)
             const fwdVec = headDir.clone().multiplyScalar(stickY); 
@@ -460,11 +400,10 @@ function handleVRInput() {
             const moveVec = fwdVec.add(strafeVec).multiplyScalar(CFG.player.speed);
             playerBody.velocity.x = moveVec.x; playerBody.velocity.z = moveVec.z;
           } else {
-            // [ワールド基準]
+            // [ワールド基準] (東西南北)
             playerBody.velocity.x = stickX * CFG.player.speed;
             playerBody.velocity.z = stickY * CFG.player.speed;
           }
-
         } else {
           playerBody.velocity.x = 0; playerBody.velocity.z = 0;
         }
@@ -504,7 +443,7 @@ function handleVRInput() {
       if (gp.buttons[4]?.pressed) {
         if (!vrState.left.xBtnHeld) {
           CFG.settings.moveRef = (CFG.settings.moveRef === 'view') ? 'world' : 'view';
-          showMsg("移動: " + (CFG.settings.moveRef === 'view' ? "視点基準" : "東西南北"), "#fff");
+          showMsg("移動:\n" + (CFG.settings.moveRef === 'view' ? "視点基準" : "東西南北固定"), "#fff");
           vrState.left.xBtnHeld = true;
         }
       } else { vrState.left.xBtnHeld = false; }
@@ -513,7 +452,7 @@ function handleVRInput() {
       if (gp.buttons[5]?.pressed) {
         if (!vrState.left.yBtnHeld) {
           CFG.settings.barrierRef = (CFG.settings.barrierRef === 'view') ? 'world' : 'view';
-          showMsg("結界位置: " + (CFG.settings.barrierRef === 'view' ? "視点中央" : "フィールド固定"), "#fff");
+          showMsg("結界生成位置:\n" + (CFG.settings.barrierRef === 'view' ? "視点中央" : "フィールド中央固定"), "#fff");
           vrState.left.yBtnHeld = true;
         }
       } else { vrState.left.yBtnHeld = false; }
@@ -693,7 +632,6 @@ function loop(t) {
 
 function init() {
   try {
-    // ★★★ 修正 4: Non-VR HUDにバージョン情報を設定 ★★★
     if (els.version) {
         els.version.textContent = `V: ${CFG.VERSION}`;
     }
