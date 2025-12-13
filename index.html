@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<title>真・結界師VR — FPS Locomotion v5.0</title>
+<title>真・結界師VR — Codebase Fix v5.1</title>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#87CEEB">
 <style>
@@ -89,7 +89,7 @@ import * as CANNON from 'cannon-es';
 // 1. CONFIG
 // --------------------------------------------------
 const CFG = {
-  VERSION: "v5.0",
+  VERSION: "v5.1", // Codebase Fix
   colors: {
     sky: 0x87CEEB, ground: 0xC2B280, 
     kekkai: 0xffff00, ghost: 0x00ffff, 
@@ -352,20 +352,21 @@ function finalizeBarrier(state, isGhost) {
   createKekkai(finalPos, finalScale, 0, isGhost);
 }
 
-function handleVRInput() {
+function handleVRInput(delta) {
   if (!renderer.xr.isPresenting) return;
   const session = renderer.xr.getSession();
   if (!session) return;
 
   const cam = renderer.xr.getCamera();
-  // ★重要修正: 頭の向き（Y軸回転）を取得して移動ベクトルに使用
-  // これにより「見ている方向」が「前」になります
-  const headRot = new THREE.Euler(0, 0, 0, 'YXZ');
-  headRot.setFromQuaternion(cam.quaternion);
-  const yaw = headRot.y;
-  
-  const forwardDir = new THREE.Vector3(0, 0, -1).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
-  const rightDir = new THREE.Vector3(1, 0, 0).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw);
+  // ★重要: VR中は HMD の向きこそが正。スティック変数には依存しない。
+  // playerGroup の向きを HMD の水平成分に常時合わせる
+  const dir = new THREE.Vector3();
+  cam.getWorldDirection(dir);
+  dir.y = 0;
+  // HMDが真上/真下を向いた時の特異点対策
+  if(dir.lengthSq() > 0.01) {
+    playerGroup.rotation.y = Math.atan2(dir.x, dir.z);
+  }
 
   for (const src of session.inputSources) {
     if (!src.gamepad) continue;
@@ -375,25 +376,35 @@ function handleVRInput() {
     if (!controllers[idx]) continue;
     const ctrlPos = controllers[idx].position;
 
-    // --- 左手: 移動 (視点基準) & 解 ---
+    // --- 左手: 移動 (Velocity上書きではなく Position直接操作) ---
     if (hand === 'left') {
-      if (gp.axes.length >= 4) { 
-        const stickX = gp.axes[2]; 
-        const stickY = gp.axes[3]; // 通常、上:-1 下:+1
-        if (Math.abs(stickX) > 0.1 || Math.abs(stickY) > 0.1) {
-          // stickYが-1の時（上）、前進させたい。forwardDirは(0,0,-1)方向。
-          // multiplyScalar(-stickY) -> -(-1) = +1 * forwardDir -> 前進
-          const moveVec = forwardDir.clone().multiplyScalar(-stickY)
-            .add(rightDir.clone().multiplyScalar(stickX));
-          
-          moveVec.normalize().multiplyScalar(CFG.player.speed); // 正規化して斜め移動速度上昇防止
+      // 軸のフォールバック (Oculus Browser vs Others 対策)
+      const axX = gp.axes.length >= 4 ? gp.axes[2] : gp.axes[0];
+      const axY = gp.axes.length >= 4 ? gp.axes[3] : gp.axes[1];
+      const stickX = axX;
+      const stickY = -axY; // 上がマイナスなので反転
 
-          playerBody.velocity.x = moveVec.x; 
-          playerBody.velocity.z = moveVec.z;
-        } else {
-          playerBody.velocity.x = 0; playerBody.velocity.z = 0;
-        }
+      if (Math.abs(stickX) > 0.1 || Math.abs(stickY) > 0.1) {
+        // HMD正面方向を取得
+        const fwd = new THREE.Vector3();
+        cam.getWorldDirection(fwd);
+        fwd.y = 0; fwd.normalize();
+        
+        // HMD右方向を取得
+        const right = new THREE.Vector3(-fwd.z, 0, fwd.x);
+
+        // 移動ベクトル合成
+        const move = new THREE.Vector3();
+        move.addScaledVector(fwd, stickY);   // 前後
+        move.addScaledVector(right, stickX); // 左右ストライフ
+        move.normalize();
+
+        const speed = CFG.player.speed * delta;
+        // ★重要: Velocity ではなく Position を直接動かす
+        playerBody.position.x += move.x * speed;
+        playerBody.position.z += move.z * speed;
       }
+
       // 左トリガー(0): 「解」
       if (gp.buttons[0]?.pressed) { if (!vrState.left.triggerHeld) { actionKai(); vrState.left.triggerHeld = true; } } else { vrState.left.triggerHeld = false; }
       // 左グリップ(1): 顕現結界
@@ -422,10 +433,19 @@ function handleVRInput() {
       }
     }
 
-    // --- 右手: 視点, 滅, 幽体, ジャンプ, 距離 ---
+    // --- 右手: 視点(スナップ), 滅, 幽体, ジャンプ, 距離 ---
     if (hand === 'right') {
-      const turnVal = gp.axes[2];
-      if (Math.abs(turnVal) > 0.2) { camAngle.yaw -= turnVal * 0.04; }
+      const axX = gp.axes.length >= 4 ? gp.axes[2] : gp.axes[0];
+      // スナップターン (VR酔い対策)
+      if (Math.abs(axX) > 0.5) { 
+        if (!vrState.right.snapTurn) {
+          playerGroup.rotation.y -= Math.sign(axX) * (Math.PI / 4);
+          vrState.right.snapTurn = true;
+        }
+      } else {
+        vrState.right.snapTurn = false;
+      }
+
       if (gp.buttons[4]?.pressed && Math.abs(playerBody.velocity.y) < 1) playerBody.velocity.y = CFG.player.jump;
       if (gp.buttons[5]?.pressed) { if (!vrState.right.bBtnHeld) { currentDist = (currentDist === CFG.dist.near) ? CFG.dist.far : CFG.dist.near; showMsg(currentDist === CFG.dist.near ? "近" : "遠", "#fff"); vrState.right.bBtnHeld = true; } } else { vrState.right.bBtnHeld = false; }
       if (gp.buttons[0]?.pressed) { if (!vrState.right.triggerHeld) { actionMetsu(); vrState.right.triggerHeld = true; } } else { vrState.right.triggerHeld = false; }
@@ -452,10 +472,8 @@ function handleVRInput() {
     }
   }
 
-  // VR時はヘッドセットの位置にカメラがあるため、プレイヤーグループ（物理体の位置）をそれに追従させるが、
-  // グループの回転はスティックによる回転(yaw)のみ適用する
+  // 位置の同期（Position移動後に同期）
   playerGroup.position.copy(playerBody.position);
-  playerGroup.rotation.y = camAngle.yaw;
 }
 
 // --- Mobile/PC Inputs ---
@@ -572,20 +590,19 @@ function setupVRControllers() { const modelFactory = new XRControllerModelFactor
 function setupVRHud() { const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 128; vrHudCtx = canvas.getContext('2d'); const tex = new THREE.CanvasTexture(canvas); vrHudMesh = new THREE.Mesh(new THREE.PlaneGeometry(1.0, 0.25), new THREE.MeshBasicMaterial({ map: tex, transparent: true, opacity: 0.9, depthTest: false })); vrHudMesh.position.set(0, 0.3, -1); vrHudMesh.renderOrder = 9999; camera.add(vrHudMesh); }
 
 function loop(t) {
-  if (renderer.xr.isPresenting) handleVRInput(); 
-
   const dt = Math.min((t - lastT) / 1000, 0.1); lastT = t; 
   world.step(1 / 60, dt, 3);
+  
+  if (renderer.xr.isPresenting) handleVRInput(dt); // dtを渡す
 
   if (!renderer.xr.isPresenting) { 
     // Mobile/PC movement logic
-    // ★重要修正: カメラのY軸回転を適用して移動方向を決定する
-    // これにより、stick上(input.yが負) -> (0,0,-1) -> カメラ前方に移動となる
     const yaw = camAngle.yaw;
     const fwd = new THREE.Vector3(input.x, 0, input.y).applyAxisAngle(new THREE.Vector3(0, 1, 0), yaw); 
+    // PC/Mobileも position直接操作にするならここも変えるが、既存で動いているならVelocityのままでも可
+    // 今回は整合性重視で Velocity操作のままにしておく（PC操作は既存コードで問題ないため）
     playerBody.velocity.x = fwd.x * CFG.player.speed; playerBody.velocity.z = fwd.z * CFG.player.speed; 
     
-    // カメラの追従
     playerGroup.position.copy(playerBody.position).add(new THREE.Vector3(0, CFG.player.height, 0)); 
     playerGroup.rotation.y = yaw; camera.rotation.x = camAngle.pitch; 
   }
