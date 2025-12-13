@@ -23,6 +23,16 @@
   .sub-text { font-size: 14px; color: #fff; text-shadow: 1px 1px 1px #000; }
   .hp-bar-bg { width: 100%; height: 8px; background: #555; margin-top: 4px; border-radius: 4px; overflow: hidden; }
   .hp-bar-val { width: 100%; height: 100%; background: #0f0; transition: width 0.2s; }
+  
+  /* バージョン表示用のスタイル */
+  #versionText { 
+    position: absolute; 
+    top: 0; 
+    right: -100px; /* HUDボックスの外に配置 */
+    font-size: 10px; 
+    color: rgba(255, 255, 255, 0.7); 
+    text-shadow: 1px 1px 0 #000;
+  }
 
   #msgArea { position: fixed; top: 35%; left: 0; width: 100%; text-align: center; pointer-events: none; z-index: 20; }
   .flash-msg { font-size: 60px; font-weight: 900; color: #fff; text-shadow: 0 0 20px #f0a, 3px 3px 0 #000; opacity: 0; transition: opacity 0.1s; transform: scale(0.8); }
@@ -72,7 +82,10 @@
 </head>
 <body>
 <div id="error-log"></div><div id="damage-overlay"></div>
-<div id="hud" class="novr-only"><div class="hud-box"><span class="big-text" id="waveVal">WAVE 1</span><br><span class="sub-text">撃破: <span id="killVal">0</span> / 残: <span id="targetVal" style="color:#f88;">3</span></span></div><div class="hud-box"><span class="sub-text">HP: <span id="hpText">100</span></span><div class="hp-bar-bg"><div id="hpBar" class="hp-bar-val"></div></div></div><div class="hud-box" id="vipBox" style="display:none; border-color:#0f0;"><span class="sub-text" style="color:#0f0;">護衛対象 (脱出中)</span><div class="hp-bar-bg"><div id="vipHpBar" class="hp-bar-val" style="background:#0ff;"></div></div></div></div>
+<div id="hud" class="novr-only">
+  <span id="versionText"></span>
+  <div class="hud-box"><span class="big-text" id="waveVal">WAVE 1</span><br><span class="sub-text">撃破: <span id="killVal">0</span> / 残: <span id="targetVal" style="color:#f88;">3</span></span></div><div class="hud-box"><span class="sub-text">HP: <span id="hpText">100</span></span><div class="hp-bar-bg"><div id="hpBar" class="hp-bar-val"></div></div></div><div class="hud-box" id="vipBox" style="display:none; border-color:#0f0;"><span class="sub-text" style="color:#0f0;">護衛対象 (脱出中)</span><div class="hp-bar-bg"><div id="vipHpBar" class="hp-bar-val" style="background:#0ff;"></div></div></div>
+</div>
 <div id="msgArea"><div id="flashMsg" class="flash-msg"></div></div><div id="centerReticle" class="novr-only"></div><button id="vrBtn">VR START</button>
 <div id="uiLayer" class="novr-only"><div id="stickZone"><div class="stick-base"><div id="stickKnob" class="stick-knob"></div></div></div><div id="padArea"><div id="modeSwitch" class="ghost">モード: 幽体</div><div id="btnUp" class="btn">距離<br><span id="distLabel" style="color:#fe0">近</span></div><div id="btnLeft" class="btn">滅<br><span style="font-size:10px">⇔解</span></div><div id="btnRight" class="btn">結<br><span style="font-size:10px">Hold</span></div><div id="btnDown" class="btn">跳</div></div></div>
 
@@ -85,6 +98,8 @@ import * as CANNON from 'cannon-es';
 // 1. CONFIG
 // --------------------------------------------------
 const CFG = {
+  // ★★★ 修正 2: バージョン定数の追加 ★★★
+  VERSION: "v3.1",
   colors: {
     sky: 0x87CEEB, ground: 0xC2B280, 
     kekkai: 0xffff00, ghost: 0x00ffff, 
@@ -98,7 +113,6 @@ const CFG = {
   kekkai: { max: 10, sensitivity: 30.0 }, // 感度30倍
   dist: { near: 6.0, far: 20.0 },
   field: { width: 120, depth: 160 },
-  // 設定のデフォルト値
   settings: {
     moveRef: 'view',    // 'view' (視点基準) or 'world' (東西南北)
     barrierRef: 'view'  // 'view' (視点中央) or 'world' (フィールド中央)
@@ -144,7 +158,19 @@ let drawId = null, drawState = { active: false, startX: 0, startY: 0, ghost: nul
 let stickId = null, stickStart = { x: 0, y: 0 }, tapTime = 0, tapPos = { x: 0, y: 0 };
 let actId = null, actStartPos = { x: 0, y: 0 }, lookId = null, lastLook = { x: 0, y: 0 };
 
-const els = { stick: document.getElementById('stickZone'), knob: document.getElementById('stickKnob'), msg: document.getElementById('flashMsg'), btnDist: document.getElementById('btnUp'), btnJump: document.getElementById('btnDown'), btnAct: document.getElementById('btnLeft'), btnDraw: document.getElementById('btnRight'), modeBtn: document.getElementById('modeSwitch'), distLabel: document.getElementById('distLabel'), wVal: document.getElementById('waveVal'), kVal: document.getElementById('killVal'), tVal: document.getElementById('targetVal'), hpText: document.getElementById('hpText'), hpBar: document.getElementById('hpBar'), dmgOverlay: document.getElementById('damage-overlay'), vipBox: document.getElementById('vipBox'), vipHpBar: document.getElementById('vipHpBar'), novr: document.querySelectorAll('.novr-only') };
+// ★★★ 修正 3: 新しい要素を els に追加 ★★★
+const els = { 
+  stick: document.getElementById('stickZone'), knob: document.getElementById('stickKnob'), 
+  msg: document.getElementById('flashMsg'), btnDist: document.getElementById('btnUp'), 
+  btnJump: document.getElementById('btnDown'), btnAct: document.getElementById('btnLeft'), 
+  btnDraw: document.getElementById('btnRight'), modeBtn: document.getElementById('modeSwitch'), 
+  distLabel: document.getElementById('distLabel'), wVal: document.getElementById('waveVal'), 
+  kVal: document.getElementById('killVal'), tVal: document.getElementById('targetVal'), 
+  hpText: document.getElementById('hpText'), hpBar: document.getElementById('hpBar'), 
+  dmgOverlay: document.getElementById('damage-overlay'), vipBox: document.getElementById('vipBox'), 
+  vipHpBar: document.getElementById('vipHpBar'), novr: document.querySelectorAll('.novr-only'),
+  version: document.getElementById('versionText') // 新規追加
+};
 
 // --------------------------------------------------
 // 3. HELPER FUNCTIONS
@@ -184,6 +210,10 @@ function updateHUD() {
   if (renderer.xr.isPresenting && vrHudCtx) { 
     const ctx = vrHudCtx; ctx.clearRect(0, 0, 512, 128); 
     ctx.fillStyle = "rgba(0, 20, 40, 0.6)"; ctx.fillRect(0,0,512,128); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(2,2,508,124); 
+    
+    // VR HUDにバージョン情報を表示
+    ctx.font = "18px sans-serif"; ctx.fillStyle = "rgba(255, 255, 255, 0.7)"; ctx.fillText(`V: ${CFG.VERSION}`, 400, 15);
+    
     ctx.font = "bold 30px sans-serif"; ctx.fillStyle = "#ffeb3b"; ctx.fillText(`WAVE ${gameState.wave}`, 20, 40); 
     ctx.fillStyle = "#fff"; ctx.font = "24px sans-serif"; ctx.fillText(`撃破: ${gameState.kills} / 残: ${gameState.req}`, 20, 80); 
     ctx.fillStyle = gameState.playerHp < 30 ? "#f55" : "#0f0"; ctx.fillText(`HP: ${gameState.playerHp}`, 300, 40); 
@@ -192,6 +222,7 @@ function updateHUD() {
     vrHudMesh.material.map.needsUpdate = true; 
   } else { 
     els.wVal.textContent = gameState.wave; els.kVal.textContent = gameState.kills; els.tVal.textContent = gameState.req; 
+    // Non-VR HUDのバージョン表示はinit時に設定
   } 
 }
 function takeDamage(val) { 
@@ -274,28 +305,46 @@ function spawnEnemy() {
 function actionMetsu() { 
   let t = null, minD = 999; 
   const pPos = renderer.xr.isPresenting ? playerGroup.position : playerBody.position; 
+  
   kekkaiList.forEach(k => { 
     if(!k.isGhost) return; 
     const d = pPos.distanceTo(k.mesh.position); 
     if (d < minD) { minD = d; t = k; } 
   }); 
   if (!t || t.shrinking) { showMsg("対象なし", "#888"); return; } 
+  
   showMsg("滅！", "#f24"); spawnText("滅", t.mesh.position, "#f24"); 
   t.shrinking = true; t.mesh.material.color.setHex(0xff0044); 
+  
   if (t.body) { world.removeBody(t.body); t.body = null; } 
-  const bbox = new THREE.Box3().setFromObject(t.mesh); let sc = t.mesh.scale.x; 
+  
+  const bbox = new THREE.Box3().setFromObject(t.mesh); 
+  let sc = t.mesh.scale.x; 
+  
   const loop = () => { 
     if (!kekkaiList.includes(t)) return; 
     sc -= 0.1; t.mesh.scale.setScalar(sc); 
-    enemies.forEach(e => { if (bbox.containsPoint(e.mesh.position)) { killEnemy(e); } }); 
-    if (sc <= 0.1) { removeKekkai(t); spawnParticle(t.mesh.position, 30, 0xffaa00); } else { requestAnimationFrame(loop); }
+    
+    enemies.forEach(e => { 
+      if (bbox.containsPoint(e.mesh.position)) { 
+        killEnemy(e); 
+      } 
+    }); 
+    
+    if (sc <= 0.1) { 
+      removeKekkai(t); 
+      spawnParticle(t.mesh.position, 30, 0xffaa00); 
+    } else {
+      requestAnimationFrame(loop); 
+    }
   }; loop(); 
 }
 
 function actionKai() { 
   if (kekkaiList.length > 0) { 
     const t = kekkaiList[kekkaiList.length - 1]; 
-    showMsg("解", "#4f8"); spawnText("解", t.mesh.position, "#4f8"); removeKekkai(t); 
+    showMsg("解", "#4f8"); spawnText("解", t.mesh.position, "#4f8"); 
+    removeKekkai(t); 
   } else { showMsg("結界なし", "#888"); } 
 }
 
@@ -308,9 +357,7 @@ function updateAimMarker() {
     
     // 設定による基準点の変更
     if (CFG.settings.barrierRef === 'world') {
-      // ワールド基準: 固定位置(0,5,0)
-      // ただし視認性のため、プレイヤー位置とワールド中心の中間などに置くことも考えられるが、
-      // 仕様通り「プレイフィールド中央付近」とする
+      // ワールド基準: フィールド中央付近(Y=5)
       aimMarker.position.set(0, 5, 0);
       aimMarker.rotation.set(0,0,0);
     } else {
@@ -373,7 +420,7 @@ function updateDynamicBarrier(state, currentHandPos, updatePhysics) {
 function finalizeBarrier(state, isGhost) {
   const finalPos = state.mesh.position.clone();
   const finalScale = state.mesh.scale.clone();
-  scene.remove(state.mesh);
+  safeRemoveMesh(state.mesh);
   if (state.body) world.removeBody(state.body);
   createKekkai(finalPos, finalScale, 0, isGhost);
 }
@@ -385,6 +432,11 @@ function handleVRInput() {
 
   const cam = renderer.xr.getCamera();
   
+  // 移動用ベクトルの計算 (ループ外で一度計算)
+  const headDir = new THREE.Vector3(); cam.getWorldDirection(headDir);
+  headDir.y = 0; headDir.normalize();
+  const headRight = new THREE.Vector3(-headDir.z, 0, headDir.x);
+
   for (const src of session.inputSources) {
     if (!src.gamepad) continue;
     const gp = src.gamepad;
@@ -402,16 +454,13 @@ function handleVRInput() {
         if (Math.abs(stickX) > 0.1 || Math.abs(stickY) > 0.1) {
           
           if (CFG.settings.moveRef === 'view') {
-            // [視点基準]
-            const headDir = new THREE.Vector3(); cam.getWorldDirection(headDir);
-            headDir.y = 0; headDir.normalize();
-            const headRight = new THREE.Vector3(-headDir.z, 0, headDir.x);
+            // [視点基準] (デフォルト)
             const fwdVec = headDir.clone().multiplyScalar(stickY); 
             const strafeVec = headRight.clone().multiplyScalar(stickX); 
             const moveVec = fwdVec.add(strafeVec).multiplyScalar(CFG.player.speed);
             playerBody.velocity.x = moveVec.x; playerBody.velocity.z = moveVec.z;
           } else {
-            // [ワールド基準] (東西南北: 上=-Z, 右=+X)
+            // [ワールド基準]
             playerBody.velocity.x = stickX * CFG.player.speed;
             playerBody.velocity.z = stickY * CFG.player.speed;
           }
@@ -433,7 +482,6 @@ function handleVRInput() {
           if (kekkaiList.length >= CFG.kekkai.max) { showMsg("上限", "#f44"); } 
           else {
             vrState.left.drawing = true; vrState.left.startHandPos.copy(ctrlPos);
-            // 生成位置は設定依存(aimMarkerの位置がupdateAimMarkerで変化済み)
             vrState.left.startOrigin.copy(aimMarker.position); 
             const g = new THREE.BoxGeometry(1, 1, 1);
             const m = new THREE.MeshPhongMaterial({ color: CFG.colors.drawPhys, transparent: true, opacity: 0.6, side: THREE.DoubleSide });
@@ -452,8 +500,7 @@ function handleVRInput() {
         }
       }
 
-      // --- 設定変更ボタン (左手X, Y) ---
-      // Xボタン (Button 4): 移動方式切り替え
+      // 4. Xボタン (Button 4): 移動方式切り替え
       if (gp.buttons[4]?.pressed) {
         if (!vrState.left.xBtnHeld) {
           CFG.settings.moveRef = (CFG.settings.moveRef === 'view') ? 'world' : 'view';
@@ -462,7 +509,7 @@ function handleVRInput() {
         }
       } else { vrState.left.xBtnHeld = false; }
 
-      // Yボタン (Button 5): 結界位置切り替え
+      // 5. Yボタン (Button 5): 結界位置切り替え
       if (gp.buttons[5]?.pressed) {
         if (!vrState.left.yBtnHeld) {
           CFG.settings.barrierRef = (CFG.settings.barrierRef === 'view') ? 'world' : 'view';
@@ -476,9 +523,13 @@ function handleVRInput() {
     if (hand === 'right') {
       const turnVal = gp.axes[2];
       if (Math.abs(turnVal) > 0.2) { camAngle.yaw -= turnVal * 0.04; }
+      // Aボタン(4): ジャンプ
       if (gp.buttons[4]?.pressed && Math.abs(playerBody.velocity.y) < 1) playerBody.velocity.y = CFG.player.jump;
+      // Bボタン(5): 距離切り替え
       if (gp.buttons[5]?.pressed) { if (!vrState.right.bBtnHeld) { currentDist = (currentDist === CFG.dist.near) ? CFG.dist.far : CFG.dist.near; showMsg(currentDist === CFG.dist.near ? "近" : "遠", "#fff"); vrState.right.bBtnHeld = true; } } else { vrState.right.bBtnHeld = false; }
+      // 右トリガー(0): 「滅」
       if (gp.buttons[0]?.pressed) { if (!vrState.right.triggerHeld) { actionMetsu(); vrState.right.triggerHeld = true; } } else { vrState.right.triggerHeld = false; }
+      // 右グリップ(1): 幽体結界
       const grip = gp.buttons[1]?.pressed;
       if (grip) {
         if (!vrState.right.drawing) {
@@ -642,6 +693,11 @@ function loop(t) {
 
 function init() {
   try {
+    // ★★★ 修正 4: Non-VR HUDにバージョン情報を設定 ★★★
+    if (els.version) {
+        els.version.textContent = `V: ${CFG.VERSION}`;
+    }
+    
     scene = new THREE.Scene(); scene.background = new THREE.Color(CFG.colors.sky); scene.fog = new THREE.FogExp2(CFG.colors.sky, 0.005); 
     camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 200); 
     playerGroup = new THREE.Group(); playerGroup.add(camera); 
