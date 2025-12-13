@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
 <meta charset="utf-8" />
-<title>真・結界師VR — Final Perfect v3.2</title>
+<title>真・結界師VR — Final Code v4.0</title>
 <meta name="viewport" content="width=device-width,initial-scale=1.0,viewport-fit=cover, user-scalable=no">
 <meta name="theme-color" content="#87CEEB">
 <style>
@@ -26,7 +26,7 @@
   #versionText { position: absolute; top: 0; right: -100px; font-size: 12px; color: rgba(255,255,255,0.8); text-shadow: 1px 1px 0 #000; font-weight:bold; }
 
   #msgArea { position: fixed; top: 35%; left: 0; width: 100%; text-align: center; pointer-events: none; z-index: 20; }
-  .flash-msg { font-size: 40px; font-weight: 900; color: #fff; text-shadow: 0 0 10px #000, 2px 2px 0 #000; opacity: 0; transition: opacity 0.1s; white-space: pre-wrap; }
+  .flash-msg { font-size: 60px; font-weight: 900; color: #fff; text-shadow: 0 0 10px #000, 2px 2px 0 #000; opacity: 0; transition: opacity 0.1s; white-space: pre-wrap; transform: scale(0.8); }
 
   /* Mobile Controllers */
   #uiLayer { position: fixed; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
@@ -89,7 +89,7 @@ import * as CANNON from 'cannon-es';
 // 1. CONFIG
 // --------------------------------------------------
 const CFG = {
-  VERSION: "v3.2",
+  VERSION: "v4.0",
   colors: {
     sky: 0x87CEEB, ground: 0xC2B280, 
     kekkai: 0xffff00, ghost: 0x00ffff, 
@@ -100,14 +100,9 @@ const CFG = {
     wood: 0x8B4513, leaf: 0x228B22, iron: 0x333333, concrete: 0xaaaaaa
   },
   player: { speed: 10.0, jump: 22.0, height: 1.7, maxHp: 100 },
-  kekkai: { max: 10, sensitivity: 30.0 },
+  kekkai: { max: 10, sensitivity: 10.0 }, // 感度10倍に調整
   dist: { near: 6.0, far: 20.0 },
-  field: { width: 120, depth: 160 },
-  // ★設定機能の初期値（ご要望通り「視点基準」をデフォルトに）
-  settings: {
-    moveRef: 'view',    // 'view' (視点基準) / 'world' (東西南北)
-    barrierRef: 'view'  // 'view' (視点中央) / 'world' (フィールド中央)
-  }
+  field: { width: 120, depth: 160 }
 };
 
 // --------------------------------------------------
@@ -124,7 +119,7 @@ let currentSession = null, lastT = 0;
 let vrState = {
   left: { 
     drawing: false, startHandPos: new THREE.Vector3(), startOrigin: new THREE.Vector3(),
-    mesh: null, body: null, triggerHeld: false, xBtnHeld: false, yBtnHeld: false 
+    mesh: null, body: null, triggerHeld: false 
   },
   right: { 
     drawing: false, startHandPos: new THREE.Vector3(), startOrigin: new THREE.Vector3(),
@@ -144,7 +139,7 @@ const els = { stick: document.getElementById('stickZone'), knob: document.getEle
 // --------------------------------------------------
 function showMsg(t, c) { 
   els.msg.textContent = t; els.msg.style.color = c; els.msg.style.opacity = 1; 
-  setTimeout(() => els.msg.style.opacity = 0, 1500); 
+  setTimeout(() => els.msg.style.opacity = 0, 500); 
 }
 function spawnText(s, p, c) { 
   const cvs = document.createElement('canvas'); cvs.width = 128; cvs.height = 64; 
@@ -174,10 +169,7 @@ function updateHUD() {
   if (renderer.xr.isPresenting && vrHudCtx) { 
     const ctx = vrHudCtx; ctx.clearRect(0, 0, 512, 128); 
     ctx.fillStyle = "rgba(0, 20, 40, 0.6)"; ctx.fillRect(0,0,512,128); ctx.strokeStyle = "#fff"; ctx.lineWidth = 2; ctx.strokeRect(2,2,508,124); 
-    
-    // VR HUD バージョン表示
     ctx.font = "18px sans-serif"; ctx.fillStyle = "rgba(255, 255, 255, 0.7)"; ctx.fillText(`V: ${CFG.VERSION}`, 430, 25);
-    
     ctx.font = "bold 30px sans-serif"; ctx.fillStyle = "#ffeb3b"; ctx.fillText(`WAVE ${gameState.wave}`, 20, 40); 
     ctx.fillStyle = "#fff"; ctx.font = "24px sans-serif"; ctx.fillText(`撃破: ${gameState.kills} / 残: ${gameState.req}`, 20, 80); 
     ctx.fillStyle = gameState.playerHp < 30 ? "#f55" : "#0f0"; ctx.fillText(`HP: ${gameState.playerHp}`, 300, 40); 
@@ -295,18 +287,11 @@ function actionKai() {
 
 function updateAimMarker() { 
   if(!playerGroup || !aimMarker) return; 
-  
   if (renderer.xr.isPresenting) { 
     const cam = renderer.xr.getCamera(); 
     const dir = new THREE.Vector3(); cam.getWorldDirection(dir); 
-    
-    // 設定による基準点の変更
-    if (CFG.settings.barrierRef === 'world') {
-      aimMarker.position.set(0, 5, 0); aimMarker.rotation.set(0,0,0);
-    } else {
-      aimMarker.position.copy(cam.position).add(dir.multiplyScalar(currentDist)); 
-      aimMarker.rotation.y = Math.atan2(dir.x, dir.z);
-    }
+    aimMarker.position.copy(cam.position).add(dir.multiplyScalar(currentDist)); 
+    aimMarker.rotation.y = Math.atan2(dir.x, dir.z);
     aimMarker.visible = true; 
   } else { 
     aimMarker.visible = true; 
@@ -373,7 +358,6 @@ function handleVRInput() {
   if (!session) return;
 
   const cam = renderer.xr.getCamera();
-  // 移動用ベクトル計算
   const headDir = new THREE.Vector3(); cam.getWorldDirection(headDir);
   headDir.y = 0; headDir.normalize();
   const headRight = new THREE.Vector3(-headDir.z, 0, headDir.x);
@@ -386,35 +370,23 @@ function handleVRInput() {
     if (!controllers[idx]) continue;
     const ctrlPos = controllers[idx].position;
 
-    // --- 左手: 移動, 解, 設定変更 ---
+    // --- 左手: 移動 (視点基準) & 解 ---
     if (hand === 'left') {
-      // 1. 移動 (スティック)
       if (gp.axes.length >= 4) { 
         const stickX = gp.axes[2]; 
         const stickY = gp.axes[3]; 
         if (Math.abs(stickX) > 0.1 || Math.abs(stickY) > 0.1) {
-          if (CFG.settings.moveRef === 'view') {
-            // [視点基準] (デフォルト)
-            const fwdVec = headDir.clone().multiplyScalar(stickY); 
-            const strafeVec = headRight.clone().multiplyScalar(stickX); 
-            const moveVec = fwdVec.add(strafeVec).multiplyScalar(CFG.player.speed);
-            playerBody.velocity.x = moveVec.x; playerBody.velocity.z = moveVec.z;
-          } else {
-            // [ワールド基準] (東西南北)
-            playerBody.velocity.x = stickX * CFG.player.speed;
-            playerBody.velocity.z = stickY * CFG.player.speed;
-          }
+          const fwdVec = headDir.clone().multiplyScalar(stickY); 
+          const strafeVec = headRight.clone().multiplyScalar(stickX); 
+          const moveVec = fwdVec.add(strafeVec).multiplyScalar(CFG.player.speed);
+          playerBody.velocity.x = moveVec.x; playerBody.velocity.z = moveVec.z;
         } else {
           playerBody.velocity.x = 0; playerBody.velocity.z = 0;
         }
       }
-
-      // 2. 左トリガー(0): 「解」
-      if (gp.buttons[0]?.pressed) { 
-        if (!vrState.left.triggerHeld) { actionKai(); vrState.left.triggerHeld = true; } 
-      } else { vrState.left.triggerHeld = false; }
-      
-      // 3. 左グリップ(1): 顕現結界
+      // 左トリガー(0): 「解」
+      if (gp.buttons[0]?.pressed) { if (!vrState.left.triggerHeld) { actionKai(); vrState.left.triggerHeld = true; } } else { vrState.left.triggerHeld = false; }
+      // 左グリップ(1): 顕現結界
       const grip = gp.buttons[1]?.pressed;
       if (grip) {
         if (!vrState.left.drawing) {
@@ -438,37 +410,15 @@ function handleVRInput() {
           vrState.left.drawing = false; vrState.left.mesh = null; vrState.left.body = null;
         }
       }
-
-      // 4. Xボタン (Button 4): 移動方式切り替え
-      if (gp.buttons[4]?.pressed) {
-        if (!vrState.left.xBtnHeld) {
-          CFG.settings.moveRef = (CFG.settings.moveRef === 'view') ? 'world' : 'view';
-          showMsg("移動:\n" + (CFG.settings.moveRef === 'view' ? "視点基準" : "東西南北固定"), "#fff");
-          vrState.left.xBtnHeld = true;
-        }
-      } else { vrState.left.xBtnHeld = false; }
-
-      // 5. Yボタン (Button 5): 結界位置切り替え
-      if (gp.buttons[5]?.pressed) {
-        if (!vrState.left.yBtnHeld) {
-          CFG.settings.barrierRef = (CFG.settings.barrierRef === 'view') ? 'world' : 'view';
-          showMsg("結界生成位置:\n" + (CFG.settings.barrierRef === 'view' ? "視点中央" : "フィールド中央固定"), "#fff");
-          vrState.left.yBtnHeld = true;
-        }
-      } else { vrState.left.yBtnHeld = false; }
     }
 
     // --- 右手: 視点, 滅, 幽体, ジャンプ, 距離 ---
     if (hand === 'right') {
       const turnVal = gp.axes[2];
       if (Math.abs(turnVal) > 0.2) { camAngle.yaw -= turnVal * 0.04; }
-      // Aボタン(4): ジャンプ
       if (gp.buttons[4]?.pressed && Math.abs(playerBody.velocity.y) < 1) playerBody.velocity.y = CFG.player.jump;
-      // Bボタン(5): 距離切り替え
       if (gp.buttons[5]?.pressed) { if (!vrState.right.bBtnHeld) { currentDist = (currentDist === CFG.dist.near) ? CFG.dist.far : CFG.dist.near; showMsg(currentDist === CFG.dist.near ? "近" : "遠", "#fff"); vrState.right.bBtnHeld = true; } } else { vrState.right.bBtnHeld = false; }
-      // 右トリガー(0): 「滅」
       if (gp.buttons[0]?.pressed) { if (!vrState.right.triggerHeld) { actionMetsu(); vrState.right.triggerHeld = true; } } else { vrState.right.triggerHeld = false; }
-      // 右グリップ(1): 幽体結界
       const grip = gp.buttons[1]?.pressed;
       if (grip) {
         if (!vrState.right.drawing) {
